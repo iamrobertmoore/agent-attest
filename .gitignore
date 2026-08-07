@@ -9,3 +9,5 @@ tools/attestation-vm/token.jwt
 tools/attestation-vm/.last-nonce
 verifier/test/fixtures/live_attestation.jwt
 verifier/test/fixtures/live_attestation.meta.json
+verifier/package-lock.json.bak
+control-plane/dist/

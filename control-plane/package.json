@@ -1,0 +1,24 @@
+{
+  "name": "@agent-attest/control-plane",
+  "version": "0.1.0",
+  "description": "Admission controller. Verifies a Confidential Space attestation, registers the agent in Google's Agent Registry, and records what it was admitted under.",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/server.js",
+    "dev": "tsx watch src/server.ts",
+    "test": "tsx --test test/*.test.ts"
+  },
+  "dependencies": {
+    "@agent-attest/confidential-space-verifier": "file:../verifier",
+    "@google-cloud/firestore": "^7.11.0",
+    "google-auth-library": "^9.15.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  },
+  "engines": { "node": ">=20" }
+}
