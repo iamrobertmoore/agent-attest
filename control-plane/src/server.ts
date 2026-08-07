@@ -9,6 +9,7 @@
 
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { apply, heartbeat, issueChallenge, revoke, DEFAULT_POLICY } from "./admission.js";
+import { decide } from "./decide.js";
 
 const PORT = Number(process.env.PORT ?? 8080);
 const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT ?? process.env.PROJECT_ID ?? "";
@@ -84,6 +85,31 @@ const routes: Record<
   "POST /admission/revoke": async (body) => {
     await revoke(str(body, "agentId"), str(body, "reason"));
     return { status: 200, body: { revoked: true } };
+  },
+
+  /**
+   * The authorization decision the gateway callout delegates to.
+   *
+   * It lives here rather than in the callout because the decision depends on the
+   * verifier and the admission record, and Google ships no Node SDK for the ext_authz
+   * wire protocol. Splitting it this way keeps exactly one implementation of "is this
+   * agent allowed" while letting the protocol adapter be written in the one language
+   * Google actually provides an ext_authz SDK for.
+   *
+   * The adapter is deliberately dumb. It translates a CheckRequest into an agentId and
+   * a Decision into an ALLOW or a DENY, and holds no policy of its own.
+   */
+  "POST /authorize": async (body) => {
+    const decision = await decide(str(body, "agentId"), {
+      projectId: PROJECT_ID,
+      ...(typeof body.freshnessWindowSec === "number"
+        ? { freshnessWindowSec: body.freshnessWindowSec }
+        : {}),
+    });
+    // Always HTTP 200. The allow/deny lives in the body, so a transport failure and a
+    // deny are never confusable by the caller. The callout fails closed on transport
+    // errors of its own accord.
+    return { status: 200, body: decision };
   },
 };
 

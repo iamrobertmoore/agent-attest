@@ -1,0 +1,5 @@
+grpcio==1.68.1
+protobuf==5.29.1
+# Envoy's ext_authz v3 protos, pre-generated.
+envoy-protos==1.32.0
+googleapis-common-protos==1.66.0
