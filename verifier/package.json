@@ -1,0 +1,44 @@
+{
+  "name": "@agent-attest/confidential-space-verifier",
+  "version": "0.1.0",
+  "description": "Browser-native verification of Google Confidential Space attestation tokens, joined to an agent's admission record. Pure WebCrypto, offline PKI/x5c path, build-time pinned root.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist", "src", "README.md"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "fetch-root": "node tools/fetch-root.mjs",
+    "test": "tsx --test test/*.test.ts",
+    "fixtures": "node test/fixtures/make-forged.mjs",
+    "bundle-size": "esbuild src/index.ts --bundle --minify --format=esm --outfile=/tmp/agent-attest-bundle.js && ls -l /tmp/agent-attest-bundle.js"
+  },
+  "keywords": [
+    "confidential-space",
+    "attestation",
+    "tee",
+    "webcrypto",
+    "gcp",
+    "agent-registry",
+    "remote-attestation",
+    "browser"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@peculiar/x509": "^2.0.0",
+    "jose": "^6.2.5",
+    "reflect-metadata": "^0.2.2"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  },
+  "engines": { "node": ">=18" }
+}

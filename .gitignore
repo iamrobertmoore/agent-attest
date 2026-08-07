@@ -1,0 +1,11 @@
+node_modules/
+dist/
+*.log
+.DS_Store
+.env
+.env.*
+# Captured attestation artefacts are regenerated, never committed as someone else's.
+tools/attestation-vm/token.jwt
+tools/attestation-vm/.last-nonce
+verifier/test/fixtures/live_attestation.jwt
+verifier/test/fixtures/live_attestation.meta.json
