@@ -4,10 +4,11 @@ dist/
 .DS_Store
 .env
 .env.*
-# Captured attestation artefacts are regenerated, never committed as someone else's.
+# Working copies of a capture run. The promoted fixture under verifier/test/fixtures
+# IS committed: it is this project's own token, and committing it means the test suite
+# runs and the demo shows a real passing verification on a fresh clone, with no GCP
+# account required. What must never be committed is somebody else's token.
 tools/attestation-vm/token.jwt
 tools/attestation-vm/.last-nonce
-verifier/test/fixtures/live_attestation.jwt
-verifier/test/fixtures/live_attestation.meta.json
 verifier/package-lock.json.bak
 control-plane/dist/
