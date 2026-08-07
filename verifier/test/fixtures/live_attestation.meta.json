@@ -1,0 +1,23 @@
+{
+  "_comment": [
+    "A real Google Confidential Space attestation token, captured from this project's",
+    "own production VM by tools/attestation-vm. Committed so the test suite runs and",
+    "the demo shows a passing verification on a fresh clone, with no GCP account.",
+    "",
+    "Attestation tokens live for one hour, so this one is permanently expired and",
+    "verifying it against the current clock correctly fails on freshness. The tests set",
+    "the evaluation time to the moment of issue and the verifier reports that as a",
+    "caveat on the result. That is inspection, not a green tick arranged for ourselves.",
+    "",
+    "Regenerate: ./run.sh setup && ./run.sh build && ./run.sh launch && ./run.sh token",
+    "            && node tools/promote-fixture.mjs"
+  ],
+  "nonce": "G0JsA70CSoz3-2o6x1URhzEhGkivm8ZUf35JVWKZyIU",
+  "imageId": "sha256:6d9033aa5cce89855a694b3b43c5a8589b83c7476677bfe88f8470caa22b17e2",
+  "issuedAt": "2026-08-07T09:16:20.000Z",
+  "expiresAt": "2026-08-07T10:16:20.000Z",
+  "hwmodel": "GCP_AMD_SEV",
+  "swname": "CONFIDENTIAL_SPACE",
+  "dbgstat": "disabled-since-boot",
+  "audience": "agent-attest-demo"
+}

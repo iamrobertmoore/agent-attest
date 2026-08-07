@@ -94,33 +94,58 @@ describe("A real Confidential Space token", () => {
     assert.equal(check(r.checks, "root.pin").ok, true);
   });
 
-  test("it is rejected against the real clock, for three independent reasons", async () => {
+  test("once expired it fails on freshness, and ONLY on freshness", async () => {
+    // Evaluated against an explicit post-expiry instant rather than the wall clock.
+    // A freshly captured fixture has not expired yet, so a test written against
+    // "now" passes or fails depending on how long ago someone ran the capture. That
+    // is the kind of test that goes green on CI and red on a laptop and teaches
+    // everyone to rerun it until it passes.
     const r = await verifyAttestation(liveToken, {
+      now: new Date(new Date(meta.expiresAt).getTime() + 86_400_000),
       expectedNonce: FIXTURE_NONCE,
       allowedImageIds: [FIXTURE_IMAGE_ID],
     });
 
     assert.equal(r.verified, false);
-
-    // 1. the token itself expired 2025-10-28
     assert.equal(check(r.checks, "claim.exp").ok, false);
-    // 2. the leaf certificate expired 2025-12-25
-    assert.equal(check(r.checks, "chain.lifetimes").ok, false);
-    // 3. it is a debug image
-    assert.equal(check(r.checks, "policy.dbgstat").ok, false);
 
-    // ...and the cryptography is still fine throughout, which is the point:
-    // the failures are policy and freshness, not forgery.
+    // This is the assertion that matters, and it is why the severity split exists.
+    // An expired attestation was a true statement about a real machine when it was
+    // issued. Nothing about it is forged, and a verifier that reported it as a
+    // cryptographic failure would be lying in the most alarming possible direction.
+    //
+    // Asserted as a property over every failing check rather than a list of ids, so
+    // it keeps holding as certificate lifetimes elapse and more time-based checks
+    // start failing. A list would have to be edited every time that happened, and
+    // editing an assertion to make it pass is how a test stops meaning anything.
+    for (const c of r.checks.filter((x) => !x.ok)) {
+      assert.notEqual(
+        c.severity,
+        "cryptographic",
+        `check "${c.id}" failed as cryptographic on a genuine token: ${c.detail}`,
+      );
+    }
+
     assert.equal(check(r.checks, "token.signature").ok, true);
     assert.equal(check(r.checks, "root.pin").ok, true);
   });
 
-  test("dbgstat is reported as a policy failure, not a cryptographic one", async () => {
+  test("a production image satisfies the debug check", async () => {
     const r = await verifyAttestation(liveToken, { now: WHEN_LIVE });
     const c = check(r.checks, "policy.dbgstat");
-    assert.equal(c.ok, false);
+    assert.equal(c.ok, true);
     assert.equal(c.severity, "policy");
-    assert.match(c.detail, /debug/i);
+  });
+
+  test("dbgstat is enforced by default, not only when asked for", async () => {
+    // The fixture is captured from --image-family=confidential-space precisely so
+    // this passes with no options set. A debug image reports dbgstat "enabled", and
+    // on one an operator can attach to the running workload and read its memory, so
+    // nothing sent to it is confidential. Defaulting this to off would make the
+    // verifier's headline result meaningless for the exact case it exists to catch.
+    const r = await verifyAttestation(liveToken, { now: WHEN_LIVE });
+    assert.equal(r.claims?.dbgstat, "disabled-since-boot");
+    assert.equal(check(r.checks, "policy.dbgstat").ok, true);
   });
 
   test("eat_nonce arrives as a bare string and is normalised", async () => {
@@ -160,15 +185,22 @@ describe("A real Confidential Space token", () => {
     assert.equal(check(r.checks, "policy.image_id").ok, false);
   });
 
-  test("it passes everything when debug images are explicitly permitted", async () => {
+  test("every check passes, on defaults, with nothing relaxed", async () => {
+    // No requireProductionDebugStatus override. This is the real admission path:
+    // a genuine production token, a nonce we issued, an image we pinned, and the
+    // verifier's own defaults. If this test ever needs an option relaxed to pass,
+    // something has regressed.
     const r = await verifyAttestation(liveToken, {
       now: WHEN_LIVE,
       expectedNonce: FIXTURE_NONCE,
       allowedImageIds: [FIXTURE_IMAGE_ID],
-      requireProductionDebugStatus: false,
     });
     const failures = r.checks.filter((c) => !c.ok);
-    assert.deepEqual(failures.map((c) => c.id), [], "expected no failing checks");
+    assert.deepEqual(
+      failures.map((c) => c.id),
+      [],
+      `expected no failing checks, got: ${failures.map((c) => `${c.id} (${c.detail})`).join("; ")}`,
+    );
     assert.equal(r.verified, true);
   });
 });
@@ -178,7 +210,6 @@ describe("fail-closed behaviour", () => {
     const r = await verifyAttestation(liveToken, {
       now: WHEN_LIVE,
       allowedImageIds: [FIXTURE_IMAGE_ID],
-      requireProductionDebugStatus: false,
     });
     assert.equal(r.verified, false);
     const c = check(r.checks, "policy.eat_nonce");
@@ -190,7 +221,6 @@ describe("fail-closed behaviour", () => {
     const r = await verifyAttestation(liveToken, {
       now: WHEN_LIVE,
       expectedNonce: FIXTURE_NONCE,
-      requireProductionDebugStatus: false,
     });
     assert.equal(r.verified, false);
     assert.equal(check(r.checks, "policy.image_id").skipped, true);
@@ -201,7 +231,6 @@ describe("fail-closed behaviour", () => {
       now: WHEN_LIVE,
       expectedNonce: FIXTURE_NONCE,
       allowedImageIds: [FIXTURE_IMAGE_ID],
-      requireProductionDebugStatus: false,
     });
     assert.equal(r.verified, true);
     assert.ok(r.caveats.length >= 4);

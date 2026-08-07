@@ -535,12 +535,15 @@ PY
   cat <<'NEXT'
 
 Next:
-  1. Paste ./token.jwt into the agent-attest page.
-  2. Set the nonce field to the value in .last-nonce.
-  3. Put the image_id above in the allowed image IDs field.
-  4. To get the on-chain check green too, register that image_id as a code hash on
-     your own the registry extension. Until then registry.codeHash will fail, correctly.
-  5. ./run.sh teardown
+  1. Promote this token into the committed test fixture:
+       cd ../.. && node tools/promote-fixture.mjs && cd verifier && npm test
+  2. Or paste ./token.jwt into the verifier page, set the nonce field to the value
+     in .last-nonce, and put the image_id above in the allowed image IDs field.
+  3. The admission checks will fail until an agent has been admitted under this
+     image_id. That is correct: a token proves what code ran, not that anyone
+     approved it. Admit it with:
+       POST /admission/apply  { agentId, token, nonce, ... }
+  4. ./run.sh teardown
 NEXT
 }
 
