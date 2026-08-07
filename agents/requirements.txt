@@ -1,0 +1,4 @@
+google-adk[a2a]==2.6.2
+google-auth==2.38.0
+requests==2.32.3
+uvicorn==0.34.0
