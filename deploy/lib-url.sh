@@ -1,85 +1,48 @@
-# Resolve the control plane's URL, and prove it actually answers.
+# Resolve the control plane's URL.
 #
-# TWO TRAPS, BOTH OF WHICH COST TIME THE FIRST TIME
+# THREE TRAPS, ALL OF WHICH COST TIME
 #
-# 1. gcloud reports more than one hostname. `status.url` gave a legacy-format host that
-#    does not route, while `gcloud run services list` gave the canonical one. Taking
-#    either on faith is a coin flip, so both are tried.
+# 1. A private Cloud Run service answers unauthorised callers with 404, not 403, so that
+#    private services do not leak their existence. A wrong-URL failure and a no-access
+#    failure are therefore indistinguishable from outside.
 #
-# 2. A private Cloud Run service answers an unauthorised caller with 404, not 403. That
-#    is deliberate on Google's part, so that private services do not leak their existence
-#    by responding differently to "wrong URL" and "no access". It is also indistinguishable
-#    from a genuinely wrong hostname, which is exactly the confusion it caused here: a
-#    Ready service with RoutesReady true, returning a Google frontend 404 on every URL.
+# 2. `status.url` can hold a stale legacy hostname that resolves but 404s at the Google
+#    frontend. `gcloud run services list` DISPLAYS the routable hostname in its table,
+#    but `--format='value(status.url)'` returns the stale one, so scripting the list
+#    command does not help. `gcloud run services proxy` also reads status.url, which is
+#    why even a correctly authenticated proxy can 404 against a healthy service.
 #
-#    The fix for the caller is an ID token audienced to the SERVICE, not to gcloud. A
-#    token from `gcloud auth print-identity-token` with no --audiences carries gcloud's
-#    own client ID as its audience and Cloud Run rejects it.
+# 3. `gcloud auth print-identity-token --audiences=` requires a service account and
+#    refuses a user account outright, so a human cannot mint a token Cloud Run accepts.
 #
-# Everything downstream of this value fails closed, so a wrong URL here surfaces two hops
-# later as "cannot attest" inside a VM, which points at the TEE rather than at the URL.
-# Worth the care.
+# Rather than interrogate gcloud, construct the canonical hostname. Cloud Run's current
+# format is deterministic: https://SERVICE-PROJECTNUMBER.REGION.run.app. Deriving it is
+# more reliable than asking, because it cannot return a stale value.
 resolve_control_plane_url () {
   local service="${1:-agent-attest-control}" region="${2:-us-central1}" project="${3:-agent-attest-2026}"
-  local candidates url code token
+  local number url
 
-  # ORDER MATTERS, and must not be left to sort(1).
-  #
-  # `gcloud run services list` reports the hostname that actually routes. `describe`
-  # can report a stale legacy host in status.url that resolves but 404s at the Google
-  # frontend, and gcloud's own `run services proxy` uses that stale value, so even a
-  # correctly authenticated proxy fails against it.
-  #
-  # An earlier version piped both through `sort -u`, which happened to put the right one
-  # first only because a digit sorts before a letter. Deduplicate while preserving order
-  # instead, so the correct URL is first by intent rather than by luck.
-  candidates="$(
-    {
-      gcloud run services list --region="${region}" --project="${project}" \
-        --filter="metadata.name=${service}" --format='value(status.url)' 2>/dev/null
-      gcloud run services describe "${service}" --region="${region}" --project="${project}" \
-        --format='value(status.url,status.urls)' 2>/dev/null | tr ';,\t' '\n'
-    } | grep '^https://' | awk '!seen[$0]++'
-  )"
+  # An explicit override always wins, for the case where Google changes the format again.
+  if [ -n "${CONTROL_PLANE_URL_OVERRIDE:-}" ]; then
+    echo "${CONTROL_PLANE_URL_OVERRIDE}"
+    return 0
+  fi
 
-  if [ -z "${candidates}" ]; then
-    echo "No URL found for ${service} in ${region}. Is it deployed?" >&2
+  number="$(gcloud projects describe "${project}" --format='value(projectNumber)' 2>/dev/null)"
+  if [ -z "${number}" ]; then
+    echo "could not read the project number for ${project}" >&2
     return 1
   fi
 
-  # An audience-scoped ID token is the only kind Cloud Run accepts, and
-  # `gcloud auth print-identity-token --audiences=` REQUIRES a service account:
-  # a user account is refused outright with "Invalid account type for --audiences".
-  #
-  # So when a human runs this, the health check cannot succeed even against a perfectly
-  # good URL. Attempting it anyway and failing closed would block the deploy on a check
-  # that is structurally impossible for the person running it, which is worse than not
-  # checking. We probe when we can, and fall back to gcloud's canonical URL when we
-  # cannot, saying which happened.
-  for url in ${candidates}; do
-    token="$(gcloud auth print-identity-token --audiences="${url}" 2>/dev/null || true)"
-    if [ -z "${token}" ]; then
-      continue
-    fi
-    code="$(curl -s -o /dev/null -w '%{http_code}' -m 10 \
-             -H "Authorization: Bearer ${token}" "${url}/healthz" || true)"
-    case "${code}" in
-      200) echo "${url}"; return 0 ;;
-      403) echo "   ${url} -> 403 (URL correct, caller lacks run.invoker)" >&2 ;;
-      404) echo "   ${url} -> 404 (wrong host, OR correct host and unauthorised)" >&2 ;;
-      *)   echo "   ${url} -> HTTP ${code}" >&2 ;;
-    esac
-  done
+  url="https://${service}-${number}.${region}.run.app"
 
-  # Fall back to the first candidate, which comes from `gcloud run services list` and is
-  # the hostname gcloud itself considers canonical.
-  url="$(echo "${candidates}" | head -n1)"
-  cat >&2 <<HINT
-   could not verify from this account (audience-scoped ID tokens need a service account)
-   using gcloud's canonical URL unverified: ${url}
-   to check it by hand:
-     gcloud run services proxy ${service} --region=${region} --project=${project} --port=8080 &
-     curl http://localhost:8080/healthz
-HINT
+  # Confirm the service exists at all. We cannot confirm it answers, because that needs
+  # a token this account cannot mint; the agents authenticate from inside the VM via the
+  # metadata server, which can.
+  if ! gcloud run services describe "${service}" --region="${region}" --project="${project}" \
+        --format='value(status.conditions[0].status)' 2>/dev/null | grep -q True; then
+    echo "   warning: ${service} is not reporting Ready in ${region}" >&2
+  fi
+
   echo "${url}"
 }

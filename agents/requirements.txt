@@ -1,4 +1,8 @@
+# Pin the one that defines the surface we build against, and let it resolve the rest.
+# google-adk 2.6.2 requires google-auth>=2.47; pinning google-auth to an older exact
+# version made the image unbuildable. Pinning every transitive dependency by hand is how
+# you get a lockfile you have to maintain and a build that breaks on the first upgrade.
 google-adk[a2a]==2.6.2
-google-auth==2.38.0
-requests==2.32.3
-uvicorn==0.34.0
+google-auth>=2.47
+requests>=2.32
+uvicorn>=0.34
