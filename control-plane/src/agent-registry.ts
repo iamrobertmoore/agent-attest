@@ -35,6 +35,14 @@ const auth = new GoogleAuth({
 
 export const AGENT_REGISTRY_HOST = "https://agentregistry.googleapis.com/v1";
 
+/**
+ * NOTE: `interfaces[].url` is GLOBALLY UNIQUE across services in a project, which the
+ * reference does not say. Registering a URL another service already claims fails with
+ * "Interface URL '...' is already in use by another service" — asynchronously, inside the
+ * long-running operation, so a client that does not poll sees a clean 200 and nothing
+ * else. A fleet sharing one image and one default port therefore admits its first agent
+ * and silently loses the rest.
+ */
 export interface RegisterAgentInput {
   projectId: string;
   location: string;

@@ -184,3 +184,34 @@ Two things make it worse together:
 `deploy/lib-url.sh` handles all of it: tries every hostname gcloud knows, mints an
 audience-scoped token per candidate, and distinguishes 403 (right URL, wrong caller) from
 404 in its output.
+
+## Platform finding: Agent Registry interface URLs are globally unique
+
+Not stated in the reference for `Service.interfaces[]`, and worth knowing because the
+failure is invisible if you are not looking for it.
+
+Registering a second service with an interface URL already claimed by another fails with:
+
+```
+The request was invalid: generic::invalid_argument:
+Interface URL 'http://localhost:8080' is already in use by another service.
+```
+
+Two things make this expensive to diagnose.
+
+First, `services.create` returns a **long-running operation**, and the uniqueness check
+happens asynchronously. The HTTP call returns 200 with an operation name. A client that
+takes the 200 as success sees nothing wrong at all.
+
+Second, the first registration succeeds. If a fleet shares an image and a default port,
+agent one is admitted and agents two, three and four are silently rejected, which looks
+like a race or a quota problem rather than a constraint on a field nobody thinks of as a
+key.
+
+That is exactly what happened here: three agents held admission records asserting registry
+entries that did not exist, because the control plane never polled the operation. The
+control plane now polls to `done` and treats a failed operation as a failed registration,
+and each agent registers its own gateway-fronted URL.
+
+Worth reporting to Google: documenting the uniqueness constraint on `interfaces[].url`
+would have made this a one-line fix instead of an afternoon.
