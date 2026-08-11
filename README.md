@@ -27,6 +27,10 @@ authorization extension. The contribution is the admission step in between.
 
 Under construction for the All Things Agentic Hackathon.
 
+## Architecture
+
+![architecture](docs/architecture.svg)
+
 ## Layout
 
 | Path | What |

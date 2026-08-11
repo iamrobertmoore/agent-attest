@@ -1,0 +1,130 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 760" width="1180" height="760" font-family="Helvetica,Arial,sans-serif">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5f6b7a"/>
+    </marker>
+    <marker id="ared" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#c0392b"/>
+    </marker>
+    <marker id="agrn" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#1e8449"/>
+    </marker>
+    <style>
+      .t{font-size:13px;fill:#1c2430}.s{font-size:11px;fill:#5f6b7a}.m{font-size:10.5px;font-family:ui-monospace,Menlo,monospace;fill:#5f6b7a}
+      .h{font-size:15px;font-weight:700;fill:#1c2430}.lbl{font-size:11px;fill:#5f6b7a}
+      .box{fill:#fff;stroke:#c7d0da;stroke-width:1.4;rx:8}
+      .goog{fill:#eef4fd;stroke:#8ab4f8;stroke-width:1.6;rx:8}
+      .ours{fill:#f2fbf5;stroke:#69b98a;stroke-width:1.6;rx:8}
+      .tee{fill:#fffaf0;stroke:#e0a800;stroke-width:1.6;rx:8}
+      .ln{stroke:#5f6b7a;stroke-width:1.6;fill:none}
+      .red{stroke:#c0392b;stroke-width:2;fill:none}
+      .grn{stroke:#1e8449;stroke-width:1.8;fill:none}
+    </style>
+  </defs>
+
+  <text x="30" y="34" class="h" font-size="19">agent-attest — admission by attestation for Google's Agent Registry</text>
+  <text x="30" y="55" class="s">Blue: Google platform.  Green: this project.  Amber: hardware-attested TEE.</text>
+
+  <!-- TEE fleet -->
+  <rect x="30" y="80" width="330" height="300" class="tee"/>
+  <text x="46" y="103" class="h">Google Confidential Space (AMD SEV)</text>
+  <text x="46" y="120" class="s">One image, four agents. Shared digest.</text>
+
+  <rect x="46" y="134" width="298" height="46" class="box"/>
+  <text x="58" y="152" class="t">Warden — orchestrator (ADK)</text>
+  <text x="58" y="169" class="s">no cloud access · holds policy + memory</text>
+
+  <rect x="46" y="188" width="298" height="42" class="box"/>
+  <text x="58" y="205" class="t">Surveyor</text><text x="58" y="221" class="s">broad read · zero write</text>
+
+  <rect x="46" y="238" width="298" height="42" class="box"/>
+  <text x="58" y="255" class="t">Assessor</text><text x="58" y="271" class="s">no credentials at all</text>
+
+  <rect x="46" y="288" width="298" height="42" class="box"/>
+  <text x="58" y="305" class="t">Executor</text><text x="58" y="321" class="s">compute.storageAdmin only · sole mutator</text>
+
+  <text x="46" y="356" class="s">Gemini 3.5 Flash via Vertex AI</text>
+  <text x="46" y="371" class="m">launcher socket → PKI attestation token</text>
+
+  <!-- control plane -->
+  <rect x="430" y="80" width="320" height="196" class="ours"/>
+  <text x="446" y="103" class="h">Admission controller (Cloud Run)</text>
+  <text x="446" y="121" class="s">sole holder of agentregistry.services.create</text>
+  <text x="446" y="146" class="t">1. issue single-use nonce</text>
+  <text x="446" y="166" class="t">2. verify token OFFLINE, 20 checks</text>
+  <text x="460" y="182" class="m">x5c chain → root pinned at build time</text>
+  <text x="446" y="202" class="t">3. digest ∈ approved allowlist?</text>
+  <text x="446" y="222" class="t">4. services.create + record</text>
+  <text x="446" y="248" class="s">Heartbeat every 60s re-proves the digest.</text>
+  <text x="446" y="264" class="s">Mismatch → revoked, with both digests.</text>
+
+  <!-- firestore -->
+  <rect x="430" y="300" width="320" height="128" class="ours"/>
+  <text x="446" y="323" class="h">Firestore — world-readable</text>
+  <text x="446" y="343" class="m">policies/admission → approved digests</text>
+  <text x="446" y="361" class="m">agents/{id} → imageDigest, admitted,</text>
+  <text x="446" y="377" class="m">   revoked, lastAttestedDigest</text>
+  <text x="446" y="395" class="m">agents/{id}/attestations → audit trail</text>
+  <text x="446" y="417" class="s">An approval only we can read is an assertion.</text>
+
+  <!-- google right -->
+  <rect x="820" y="80" width="330" height="120" class="goog"/>
+  <text x="836" y="103" class="h">Google Agent Registry</text>
+  <text x="836" y="123" class="m">projects/…/services/surveyor</text>
+  <text x="836" y="145" class="s">No state. No approvalState. No labels.</text>
+  <text x="836" y="161" class="s">Nowhere to record what an agent runs,</text>
+  <text x="836" y="177" class="s">which is why the record lives alongside.</text>
+
+  <rect x="820" y="224" width="330" height="118" class="goog"/>
+  <text x="836" y="247" class="h">Agent Gateway</text>
+  <text x="836" y="267" class="s">every hop between every agent</text>
+  <text x="836" y="287" class="m">ext_authz v3 · REQUEST_AUTHZ</text>
+  <text x="836" y="305" class="m">failOpen: false</text>
+  <text x="836" y="326" class="s">(Google's own samples ship failOpen: true)</text>
+
+  <rect x="820" y="366" width="330" height="62" class="ours"/>
+  <text x="836" y="389" class="h">gateway-ext (Python)</text>
+  <text x="836" y="409" class="s">protocol adapter only · no policy · fails closed</text>
+
+  <!-- arrows -->
+  <path class="ln" d="M360 190 L430 160" marker-end="url(#a)"/>
+  <text x="366" y="176" class="lbl">attestation + nonce</text>
+
+  <path class="ln" d="M750 130 L820 130" marker-end="url(#a)"/>
+  <text x="752" y="122" class="lbl">services.create</text>
+
+  <path class="ln" d="M750 200 L790 200 L790 350 L750 350" marker-end="url(#a)"/>
+  <text x="756" y="286" class="lbl">record</text>
+
+  <path class="ln" d="M985 342 L985 366" marker-end="url(#a)"/>
+  <text x="992" y="358" class="lbl">gRPC</text>
+
+  <path class="grn" d="M820 397 L780 397 L780 380 L750 380" marker-end="url(#agrn)"/>
+  <text x="756" y="446" class="lbl" fill="#1e8449">admitted &amp; fresh → ALLOW</text>
+
+  <!-- browser -->
+  <rect x="30" y="470" width="330" height="118" class="ours"/>
+  <text x="46" y="493" class="h">Browser verification page</text>
+  <text x="46" y="513" class="s">Same verifier source, unchanged. 65,751 B gzipped.</text>
+  <text x="46" y="533" class="s">Paste a token, recompute the verdict locally</text>
+  <text x="46" y="549" class="s">against the pinned root. No account. No trust</text>
+  <text x="46" y="565" class="s">in our servers.</text>
+  <path class="ln" d="M360 520 L430 400" marker-end="url(#a)"/>
+  <text x="366" y="470" class="lbl">public read</text>
+
+  <!-- the event -->
+  <rect x="430" y="470" width="720" height="118" fill="#fdf3f2" stroke="#c0392b" stroke-width="1.8" rx="8"/>
+  <text x="448" y="494" class="h" fill="#c0392b">The event this exists to catch</text>
+  <text x="448" y="516" class="t">Redeploy different code under the same name, service account and registry entry.</text>
+  <text x="448" y="536" class="s">SPIFFE ID unchanged · IAM unchanged · Agent Registry entry byte-identical · Google notices nothing</text>
+  <text x="448" y="562" class="m" fill="#c0392b">revoked: Presented sha256:d55ba184… but was admitted as sha256:7ed64675…</text>
+  <text x="448" y="578" class="m" fill="#c0392b">The identity is unchanged and the registry entry is unchanged. The code is not.</text>
+
+  <!-- flow strip -->
+  <rect x="30" y="620" width="1120" height="52" fill="#f7f9fb" stroke="#c7d0da" stroke-width="1.2" rx="8"/>
+  <text x="48" y="652" class="t">source → reproducible build → image digest → <tspan font-weight="700">attested by the TEE</tspan> → <tspan font-weight="700">verified offline vs pinned root</tspan> → operator-approved digest → admitted → <tspan font-weight="700">re-proved every 60s</tspan> → enforced on every hop</text>
+
+  <text x="30" y="706" class="s">Attestation proves which image ran. It does not prove that code is correct or safe. Pinning an image pins the code, not the behaviour.</text>
+  <text x="30" y="724" class="s">Revocation is not checked: the intermediate's CRL is served without CORS headers, so a browser cannot fetch it.</text>
+  <text x="30" y="742" class="s">The gateway checks admission, revocation and freshness. The digest comparison happens at heartbeat time, because only the workload can mint a token.</text>
+</svg>
