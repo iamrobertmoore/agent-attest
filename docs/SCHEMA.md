@@ -78,17 +78,35 @@ Append-only. Every heartbeat, passing or failing.
 This is the audit trail the Fleet track asks for under Telemetry, and it is what makes an
 incident reconstructable after the fact. Each entry also emits an OpenTelemetry span.
 
-## `policies/{policyId}`
+## `policies/admission`
 
 The admission policy the controller enforces, stored rather than hardcoded so the demo can
-show it being tightened.
+show a digest being approved and revoked without redeploying anything.
 
-| Field | Type |
-|---|---|
-| `allowedHwModels` | array of string |
-| `requireProductionDebugStatus` | bool |
-| `freshnessWindowSec` | int |
-| `requiredLaunchPolicy` | map |
+| Field | Type | Notes |
+|---|---|---|
+| `allowedImageDigests` | array of string | **The approval.** Docker CONFIG digests, `sha256:...` |
+| `allowedHwModels` | array of string | |
+| `requireProductionDebugStatus` | bool | |
+| `freshnessWindowSec` | int | |
+
+`allowedImageDigests` is the operator saying "this exact code may join the fleet". It is a
+separate act from the attestation, which proves the running code IS one of these digests.
+The system needs both. An allowlist without attestation is a database row that anyone who
+can edit the database can satisfy. An attestation without an allowlist is trust-on-first-use:
+whoever launches a workload first admits themselves.
+
+**Config digest, not manifest digest.** Confidential Space reports
+`submods.container.image_id`, which is the Docker *config* digest. That is what
+`docker inspect --format='{{.Id}}'` returns and what the build log prints as
+`exporting config sha256:...`. It is NOT the digest `docker push` prints, which is the
+manifest digest. They differ, and using the wrong one produces an allowlist that silently
+never matches.
+
+The policy document is world-readable like the admission records, for the same reason: an
+approval nobody can inspect is an assertion. It is written by the deploy script using OAuth
+and IAM, which bypasses security rules, so `allow write: if false` in the rules does not
+block it.
 
 ---
 

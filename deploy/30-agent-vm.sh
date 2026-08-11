@@ -91,6 +91,33 @@ if [ "${SKIP_BUILD:-}" != "true" ]; then
   fi
   echo "   all permitted"
 
+  # Approve this digest for admission.
+  #
+  # This is the operator saying "this exact code may join the fleet". It is a separate
+  # act from the attestation, which proves the running code IS this digest. The system
+  # needs both: an allowlist alone is a database row, and an attestation alone is a
+  # stranger asserting their own legitimacy.
+  #
+  # image_id in the attestation is the Docker CONFIG digest, which is what
+  # `docker inspect --format={{.Id}}` returns and what the build log prints as
+  # "exporting config sha256:...". It is NOT the manifest digest `docker push` prints.
+  # They differ, and using the wrong one gives an allowlist that never matches.
+  CONFIG_DIGEST="$(docker inspect --format='{{.Id}}' "${IMAGE}")"
+  echo "== approving digest for admission"
+  echo "   ${CONFIG_DIGEST}"
+  curl -s -X PATCH \
+    -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+    -H "Content-Type: application/json" \
+    "https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/(default)/documents/policies/admission?updateMask.fieldPaths=allowedImageDigests" \
+    -d "{\"fields\":{\"allowedImageDigests\":{\"arrayValue\":{\"values\":[{\"stringValue\":\"${CONFIG_DIGEST}\"}]}}}}" \
+    > /tmp/agent-attest-policy.json
+  if grep -q '"error"' /tmp/agent-attest-policy.json; then
+    echo "   ERROR writing the admission policy:"
+    cat /tmp/agent-attest-policy.json
+    exit 1
+  fi
+  echo "   approved"
+
   echo "== booting the image locally to check it starts at all"
   if ! docker run --rm --platform linux/amd64 \
         -e AGENT="${AGENT}" -e SKIP_ATTESTATION=true \

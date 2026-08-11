@@ -52,6 +52,29 @@ function sha256(s: string): string {
 }
 
 /**
+ * The digests an operator has approved for admission.
+ *
+ * Stored rather than hardcoded so the demo can show one being added and an agent
+ * becoming admissible, and one being removed and an agent becoming inadmissible, without
+ * redeploying the control plane.
+ *
+ * Note these are Docker CONFIG digests, which is what Confidential Space reports as
+ * submods.container.image_id, and NOT the manifest digest that `docker push` prints.
+ * They differ, and confusing them yields an allowlist that never matches anything.
+ * `docker inspect --format='{{.Id}}'` gives the right one.
+ */
+async function loadAllowedDigests(): Promise<string[]> {
+  const snap = await db.collection("policies").doc("admission").get();
+  if (!snap.exists) return [];
+  const data = snap.data() as { allowedImageDigests?: unknown };
+  const list = data.allowedImageDigests;
+  if (!Array.isArray(list)) return [];
+  return list.filter(
+    (d): d is string => typeof d === "string" && d.startsWith("sha256:"),
+  );
+}
+
+/**
  * Issue a challenge.
  *
  * The nonce is stored, not merely signed, because it has to be consumable exactly once
@@ -162,10 +185,35 @@ export async function apply(input: ApplyInput): Promise<ApplyResult> {
     };
   }
 
+  // THE DIGEST ALLOWLIST IS THE APPROVAL.
+  //
+  // An earlier version verified without allowedImageIds, on the reasoning that the
+  // digest an agent presents at admission becomes the digest it is pinned to. The
+  // verifier refused to call that verified, correctly: with no allowlist, admission is
+  // trust-on-first-use, and anyone able to launch a Confidential Space workload could
+  // admit themselves. The attestation would prove what code ran; nobody would have said
+  // that code was allowed to run.
+  //
+  // So approval is an operator decision about a digest, made in advance and recorded in
+  // policies/admission. Attestation then proves the running code IS that digest. Those
+  // are two different claims and the system needs both: the allowlist without
+  // attestation is a database row, and attestation without the allowlist is a
+  // stranger asserting their own legitimacy.
+  const allowedImageIds = await loadAllowedDigests();
+  if (allowedImageIds.length === 0) {
+    return {
+      admitted: false,
+      reason:
+        "No approved image digests in policies/admission. Refusing to admit anything " +
+        "rather than falling back to trusting whatever digest was presented.",
+    };
+  }
+
   const result = await verifyAttestation(input.token, {
     expectedNonce: input.nonce,
     allowedHwModels: DEFAULT_POLICY.allowedHwModels,
     requireProductionDebugStatus: DEFAULT_POLICY.requireProductionDebugStatus,
+    allowedImageIds,
   });
   const verdict = summarise(result.checks, result.verified, [...result.caveats]);
 
