@@ -260,3 +260,20 @@ no policy of its own.
 
 The honest claim is therefore: the extension is registered and exercised, and the gateway
 binding covers the protocol Google currently supports.
+
+## Platform note: created is not the same as ready
+
+A `googleManaged` Agent Gateway is provisioned asynchronously in a Google-run tenant
+project. `agent-gateways import` returns a complete resource, with a name, an etag and
+timestamps, and `describe` finds it straight away. Binding an authorization policy to it
+nonetheless fails:
+
+```
+Failed to update tenant configuration for AgentGateway:
+generic::cancelled: agent gateway "agent-attest-gw" is not yet provisioned in the tenant project
+```
+
+Nothing in the create response distinguishes created from ready. There is no state field
+to poll, so the only signal is the error text from the operation that needs it. The deploy
+script retries on that specific message for up to twelve minutes and fails immediately on
+anything else, because retrying an unrelated error is how a script hides a real fault.

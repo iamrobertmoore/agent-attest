@@ -192,8 +192,33 @@ customProvider:
       - "projects/${PROJECT}/locations/${REGION}/authzExtensions/agent-attest-authz"
 YAML
 echo "   policyProfile: REQUEST_AUTHZ  (CONTENT_AUTHZ cannot be made fail-closed)"
-gcloud beta network-security authz-policies import agent-attest-policy \
-  --project="${PROJECT}" --source=/tmp/authz-policy.yaml --location="${REGION}"
+
+# A googleManaged gateway is provisioned asynchronously in a Google-run tenant project.
+# The AgentGateway resource exists and is describable immediately, but binding a policy
+# to it fails until that provisioning finishes:
+#
+#   "agent gateway ... is not yet provisioned in the tenant project"
+#
+# Resource created is not the same as resource ready, and nothing in the create response
+# distinguishes the two. So retry rather than treat the first attempt as the answer.
+bound=0
+for attempt in $(seq 1 12); do
+  if gcloud beta network-security authz-policies import agent-attest-policy \
+       --project="${PROJECT}" --source=/tmp/authz-policy.yaml --location="${REGION}" 2>/tmp/aa-authz-err; then
+    bound=1
+    break
+  fi
+  if grep -q "not yet provisioned" /tmp/aa-authz-err; then
+    echo "   tenant project still provisioning, waiting 60s (attempt ${attempt}/12)"
+    sleep 60
+  else
+    echo "   binding failed for a reason other than provisioning:"
+    cat /tmp/aa-authz-err
+    exit 1
+  fi
+done
+[ "${bound}" = "1" ] || { echo "   still not provisioned after 12 minutes; retry later"; exit 1; }
+echo "   policy bound"
 
 step "Done"
 cat <<NEXT
