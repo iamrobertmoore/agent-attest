@@ -35,11 +35,35 @@ echo "== control plane: ${CONTROL_PLANE_URL}"
 
 if [ "${SKIP_BUILD:-}" != "true" ]; then
   echo "== building ${IMAGE}"
-  # --platform linux/amd64 explicitly: Confidential Space is amd64 only, and an arm64
-  # image built on an Apple Silicon laptop launches, fails to exec, and the VM stops
-  # before writing anything useful anywhere.
-  docker build --platform linux/amd64 -f "${ROOT}/agents/Dockerfile" -t "${IMAGE}" "${ROOT}/agents"
+  # Three flags, all load-bearing.
+  #
+  # --platform linux/amd64: Confidential Space is amd64 only. An arm64 image from an
+  #   Apple Silicon laptop launches, fails to exec, and stops the VM before writing
+  #   anything useful anywhere.
+  #
+  # --provenance=false --sbom=false: buildx attaches a provenance attestation by default,
+  #   which turns the result into a multi-manifest INDEX rather than a plain image. The
+  #   Confidential Space launcher wants a single-platform image and silently fails to
+  #   resolve an index, which presents as a VM that boots, logs nothing, and does nothing.
+  #   The build log gives it away: "exporting attestation manifest" then "exporting
+  #   manifest list".
+  docker build --platform linux/amd64 --provenance=false --sbom=false \
+    -f "${ROOT}/agents/Dockerfile" -t "${IMAGE}" "${ROOT}/agents"
   docker push "${IMAGE}"
+
+  # Refuse to launch a VM against an image the launcher cannot resolve. Checking costs a
+  # second; not checking costs a VM cycle and a confusing silence.
+  echo "== confirming it is a plain single-platform image"
+  mediatype="$(docker manifest inspect "${IMAGE}" 2>/dev/null \
+    | python3 -c 'import json,sys; print(json.load(sys.stdin).get("mediaType",""))' 2>/dev/null || true)"
+  echo "   mediaType: ${mediatype:-unknown}"
+  case "${mediatype}" in
+    *manifest.list*|*image.index*)
+      echo "   ERROR: this is a manifest list, not a single image."
+      echo "   Confidential Space will not resolve it. Rebuild with --provenance=false --sbom=false."
+      exit 1 ;;
+    *) echo "   single image, good" ;;
+  esac
 fi
 
 # Allow the agent's service account to invoke the control plane. Least privilege, per

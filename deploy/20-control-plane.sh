@@ -12,7 +12,7 @@ echo "== building ${IMAGE}"
 # Built from the repo root: the Dockerfile copies both verifier/ and control-plane/,
 # because the control plane depends on the verifier by path. One verifier, one
 # implementation, no vendored copy that can drift.
-docker build --platform linux/amd64 \
+docker build --platform linux/amd64 --provenance=false --sbom=false \
   -f "${ROOT}/control-plane/Dockerfile" -t "${IMAGE}" "${ROOT}"
 docker push "${IMAGE}"
 
