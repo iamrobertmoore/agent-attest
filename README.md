@@ -31,7 +31,7 @@ Under construction for the All Things Agentic Hackathon.
 
 | Path | What |
 |---|---|
-| `verifier/` | Confidential Space attestation verification. Pure WebCrypto, offline PKI (`x5c`) path, no backend, runs unchanged in a browser and in Node. |
+| `verifier/` | Confidential Space attestation verification. Pure WebCrypto, offline PKI (`x5c`) path, no backend, runs unchanged in a browser and in Node. 65,751 bytes gzipped, measured by `web/build.sh`. |
 | `control-plane/` | Admission controller. Verifies, calls `services.create`, writes the admission record. |
 | `gateway-ext/` | Agent Gateway authorization extension. The gRPC callout that allows or denies. |
 | `agents/` | The demo fleet: orchestrator plus specialised workers. |
@@ -71,3 +71,20 @@ registry binding rewritten. The attestation capture tooling has the same origin.
 ## Licence
 
 MIT. See `LICENSE`.
+
+## Verify it yourself
+
+`web/` is a single page that bundles the verifier and runs it client-side. Paste an
+attestation token and it recomputes the same verdict the control plane reached, against a
+Google root certificate pinned at build time, with no account and no trust in our servers.
+The admission records it joins against are world-readable in Firestore for the same
+reason: an approval only we can read is an assertion.
+
+```bash
+./web/build.sh
+npx -y serve web/dist
+```
+
+The bundle is the control plane's own verifier source, unchanged. That is the point. A
+second implementation written to agree with the first would prove only that we can write
+two things that agree.

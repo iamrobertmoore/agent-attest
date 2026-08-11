@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>agent-attest — check the admission for yourself</title>
+<style>
+  :root {
+    --bg:#0f1115; --panel:#161a21; --line:#262c36; --ink:#e6e9ef; --dim:#8b95a6;
+    --ok:#3fb950; --bad:#f85149; --warn:#d29922; --accent:#58a6ff; --mono: ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink);
+         font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
+  main { max-width:940px; margin:0 auto; padding:40px 20px 80px; }
+  h1 { font-size:26px; margin:0 0 6px; letter-spacing:-.02em; }
+  h2 { font-size:17px; margin:36px 0 10px; }
+  .lede { color:var(--dim); margin:0 0 8px; max-width:70ch; }
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:10px;
+           padding:18px; margin:14px 0; }
+  textarea, input { width:100%; background:#0b0d11; color:var(--ink); border:1px solid var(--line);
+                    border-radius:7px; padding:10px; font-family:var(--mono); font-size:12px; }
+  textarea { height:110px; resize:vertical; }
+  .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:10px; }
+  button { background:var(--accent); color:#04101f; border:0; border-radius:7px;
+           padding:9px 15px; font-weight:600; cursor:pointer; font-size:14px; }
+  button.ghost { background:transparent; color:var(--accent); border:1px solid var(--line); }
+  button:disabled { opacity:.5; cursor:default; }
+  .verdict { font-size:17px; font-weight:700; margin:14px 0 4px; }
+  .verdict.ok { color:var(--ok); } .verdict.bad { color:var(--bad); }
+  ul.checks { list-style:none; padding:0; margin:10px 0 0; }
+  ul.checks li { border-top:1px solid var(--line); padding:9px 0; display:grid;
+                 grid-template-columns:22px 1fr; gap:10px; }
+  .mark.ok { color:var(--ok); } .mark.bad { color:var(--bad); } .mark.skip { color:var(--dim); }
+  .ttl { font-weight:600; }
+  .det { color:var(--dim); font-size:13px; }
+  .sev { font-family:var(--mono); font-size:10px; text-transform:uppercase; letter-spacing:.06em;
+         border:1px solid var(--line); border-radius:4px; padding:1px 5px; margin-left:7px; color:var(--dim); }
+  .sev.cryptographic { color:var(--bad); border-color:#5a2b2b; }
+  .sev.freshness { color:var(--warn); border-color:#5a4a1e; }
+  .sev.policy { color:var(--accent); border-color:#25405f; }
+  code, .mono { font-family:var(--mono); font-size:12px; word-break:break-all; }
+  .caveats { border-left:3px solid var(--warn); padding:2px 0 2px 14px; margin-top:18px; }
+  .caveats li { color:var(--dim); font-size:13px; margin-bottom:9px; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th,td { text-align:left; padding:8px 6px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { color:var(--dim); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:.06em; }
+  .pill { font-size:11px; padding:2px 7px; border-radius:999px; font-weight:600; }
+  .pill.ok { background:#123f1c; color:var(--ok); } .pill.bad { background:#42191a; color:var(--bad); }
+  footer { color:var(--dim); font-size:13px; margin-top:50px; border-top:1px solid var(--line); padding-top:18px; }
+  a { color:var(--accent); }
+</style>
+</head>
+<body>
+<main>
+
+  <h1>Check the admission for yourself</h1>
+  <p class="lede">
+    Google's Agent Registry records that an agent exists. It does not record what code that
+    agent is running. agent-attest gates admission on a Confidential Space attestation, and
+    every verdict it reaches is one you can recompute here, in your own browser, against a
+    Google root certificate pinned into this page at build time.
+  </p>
+  <p class="lede">
+    Nothing on this page trusts our servers. The signature check, the certificate chain walk
+    and the root comparison all run locally in WebCrypto. The only network call is a public,
+    read-only fetch of the admission record, and if you think we faked that, the cryptography
+    above it still holds independently.
+  </p>
+
+  <h2>1. Verify an attestation token</h2>
+  <div class="panel">
+    <textarea id="token" spellcheck="false" placeholder="Paste a Confidential Space PKI attestation token (three dot-separated segments)"></textarea>
+    <div class="row">
+      <input id="nonce" style="flex:2;min-width:240px" placeholder="Expected nonce (optional, but omitting it means no replay protection)">
+      <input id="agentId" style="flex:1;min-width:160px" placeholder="Agent id, e.g. surveyor">
+    </div>
+    <div class="row">
+      <button id="go">Verify</button>
+      <button id="sample" class="ghost">Load the committed sample</button>
+      <label style="color:var(--dim);font-size:13px">
+        <input type="checkbox" id="inspect" style="width:auto"> evaluate at issue time
+      </label>
+    </div>
+    <div id="out"></div>
+  </div>
+
+  <h2>2. Live admission records</h2>
+  <p class="lede">
+    Read straight from Firestore by your browser, unauthenticated. These are deliberately
+    world-readable: an approval only we can read is an assertion, and the point of the project
+    is that approval should be checkable.
+  </p>
+  <div class="panel">
+    <div class="row"><button id="refresh" class="ghost">Load admission records</button></div>
+    <div id="records"><p class="det">Not loaded.</p></div>
+  </div>
+
+  <footer>
+    <strong>What a green result does and does not mean.</strong> It means this token was
+    signed by Google's Confidential Space attestation service, that the certificate chain
+    builds to the root pinned in this page, and that the image digest matches the one the
+    agent was admitted under. It does not mean the code is correct, safe, or does what it
+    claims. Pinning an image pins the code, not the behaviour.
+    <br><br>
+    Source: <a href="https://github.com/iamrobertmoore/agent-attest">github.com/iamrobertmoore/agent-attest</a>
+  </footer>
+</main>
+
+<script type="module">
+import { verifyAttestation, checkRegistryBinding, REGISTRY_CAVEATS }
+  from "./verifier.js";
+
+const PROJECT_ID = document.currentScript?.dataset?.project || "agent-attest-2026";
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;" }[c]));
+
+function renderChecks(checks) {
+  return `<ul class="checks">${checks.map(c => {
+    const cls = c.skipped ? "skip" : c.ok ? "ok" : "bad";
+    const mark = c.skipped ? "–" : c.ok ? "✓" : "✕";
+    return `<li><span class="mark ${cls}">${mark}</span><div>
+      <span class="ttl">${esc(c.title)}</span><span class="sev ${c.severity}">${c.severity}</span>
+      <div class="det">${esc(c.detail)}</div></div></li>`;
+  }).join("")}</ul>`;
+}
+
+async function run() {
+  const token = $("token").value.trim();
+  if (!token) return;
+  $("out").innerHTML = `<p class="det">Verifying locally…</p>`;
+
+  const opts = {};
+  const nonce = $("nonce").value.trim();
+  if (nonce) opts.expectedNonce = nonce;
+
+  // Inspection mode: evaluate time-based checks at the moment of issue so an expired
+  // sample can be examined. The verifier reports this as a caveat rather than hiding it,
+  // because a green tick we arranged for ourselves is worth nothing.
+  if ($("inspect").checked) {
+    try {
+      const p = JSON.parse(atob(token.split(".")[1].replace(/-/g,"+").replace(/_/g,"/")));
+      if (p.iat) opts.now = new Date(p.iat * 1000);
+    } catch {}
+  }
+
+  const r = await verifyAttestation(token, opts);
+  let checks = [...r.checks];
+  let caveats = [...r.caveats];
+
+  const agentId = $("agentId").value.trim();
+  if (agentId && r.claims) {
+    try {
+      checks = checks.concat(await checkRegistryBinding(r.claims, { projectId: PROJECT_ID, agentId }));
+      caveats = caveats.concat(REGISTRY_CAVEATS);
+    } catch (e) {
+      checks.push({ id:"admission.read", title:"Admission record is readable", ok:false,
+                    detail:String(e), severity:"policy" });
+    }
+  }
+
+  const failed = checks.filter(c => !c.ok);
+  const crypto = failed.filter(c => c.severity === "cryptographic");
+  const pass = failed.length === 0;
+
+  // The headline distinguishes forgery from everything else. An expired attestation was
+  // a true statement about a real machine when it was issued, and calling that "invalid"
+  // is wrong in the most alarming possible direction.
+  let head;
+  if (pass) head = `<div class="verdict ok">Verified</div>`;
+  else if (crypto.length) head = `<div class="verdict bad">Not genuine — ${crypto.length} cryptographic failure(s)</div>`;
+  else head = `<div class="verdict bad">Genuine token, but not admissible — ${failed.length} policy or freshness failure(s)</div>`;
+
+  $("out").innerHTML = head +
+    `<p class="det mono">evaluated ${esc(r.evaluatedAt)}</p>` +
+    renderChecks(checks) +
+    `<div class="caveats"><ul>${caveats.map(c => `<li>${esc(c)}</li>`).join("")}</ul></div>`;
+}
+
+async function loadRecords() {
+  $("records").innerHTML = `<p class="det">Loading…</p>`;
+  const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/agents`;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const docs = (await res.json()).documents || [];
+    if (!docs.length) { $("records").innerHTML = `<p class="det">No agents admitted yet.</p>`; return; }
+    const f = (d,k) => d.fields?.[k]?.stringValue ?? d.fields?.[k]?.timestampValue ?? "";
+    const b = (d,k) => d.fields?.[k]?.booleanValue === true;
+    $("records").innerHTML = `<table><tr>
+        <th>Agent</th><th>Admitted image digest</th><th>Platform</th><th>Last attested</th><th>State</th></tr>` +
+      docs.map(d => {
+        const id = d.name.split("/").pop();
+        const live = b(d,"admitted") && !b(d,"revoked");
+        return `<tr><td class="mono">${esc(id)}</td>
+          <td class="mono">${esc(f(d,"imageDigest"))}</td>
+          <td class="mono">${esc(f(d,"platform"))}</td>
+          <td class="mono">${esc(f(d,"lastAttestedAt"))}</td>
+          <td><span class="pill ${live?"ok":"bad"}">${live?"admitted":"revoked"}</span>
+            ${b(d,"revoked") ? `<div class="det">${esc(f(d,"revokedReason"))}</div>` : ""}</td></tr>`;
+      }).join("") + `</table>`;
+  } catch (e) {
+    $("records").innerHTML = `<p class="det">Could not read admission records: ${esc(e)}</p>`;
+  }
+}
+
+$("go").onclick = run;
+$("refresh").onclick = loadRecords;
+$("sample").onclick = async () => {
+  const [t, m] = await Promise.all([
+    fetch("./sample/live_attestation.jwt").then(r => r.text()),
+    fetch("./sample/live_attestation.meta.json").then(r => r.json()),
+  ]);
+  $("token").value = t.trim();
+  $("nonce").value = m.nonce;
+  $("inspect").checked = true;
+};
+loadRecords();
+</script>
+</body>
+</html>
