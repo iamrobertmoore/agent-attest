@@ -182,7 +182,7 @@ for z in us-central1-c us-central1-a us-central1-b us-central1-f; do
       --service-account="${SA}" \
       --image-project=confidential-space-images \
       --image-family=confidential-space \
-      --metadata="^~^tee-image-reference=${IMAGE}~tee-container-log-redirect=true~tee-env-AGENT=${AGENT}~tee-env-CONTROL_PLANE_URL=${CONTROL_PLANE_URL}~tee-env-TARGET_PROJECT_ID=${PROJECT}~tee-env-GATEWAY_HOST=${GATEWAY_HOST:-invalid.local}~tee-env-EXECUTOR_ARMED=${EXECUTOR_ARMED:-false}~tee-env-GOOGLE_CLOUD_PROJECT=${PROJECT}~tee-env-GOOGLE_CLOUD_LOCATION=${REGION}~tee-env-GOOGLE_GENAI_USE_VERTEXAI=TRUE"
+      --metadata="^~^tee-image-reference=${IMAGE}~tee-container-log-redirect=true~tee-env-AGENT=${AGENT}~tee-env-CONTROL_PLANE_URL=${CONTROL_PLANE_URL}~tee-env-TARGET_PROJECT_ID=${PROJECT}~tee-env-GATEWAY_HOST=${GATEWAY_HOST:-agents.agent-attest.internal}~tee-env-PUBLIC_URL=https://${AGENT}.${GATEWAY_HOST:-agents.agent-attest.internal}~tee-env-EXECUTOR_ARMED=${EXECUTOR_ARMED:-false}~tee-env-GOOGLE_CLOUD_PROJECT=${PROJECT}~tee-env-GOOGLE_CLOUD_LOCATION=${REGION}~tee-env-GOOGLE_GENAI_USE_VERTEXAI=TRUE"
   then
     echo "${z}" > "${ROOT}/deploy/.zone-${AGENT}"
     launched=1

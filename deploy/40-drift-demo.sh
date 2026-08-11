@@ -76,7 +76,7 @@ gcloud --quiet compute instances create "agent-attest-${AGENT}" \
   --scopes=cloud-platform \
   --service-account="agent-attest-${AGENT}@${PROJECT}.iam.gserviceaccount.com" \
   --image-project=confidential-space-images --image-family=confidential-space \
-  --metadata="^~^tee-image-reference=${IMAGE}~tee-container-log-redirect=true~tee-env-AGENT=${AGENT}~tee-env-CONTROL_PLANE_URL=${CONTROL_PLANE_URL}~tee-env-TARGET_PROJECT_ID=${PROJECT}~tee-env-GATEWAY_HOST=${GATEWAY_HOST:-invalid.local}~tee-env-GOOGLE_CLOUD_PROJECT=${PROJECT}~tee-env-GOOGLE_CLOUD_LOCATION=${REGION}~tee-env-GOOGLE_GENAI_USE_VERTEXAI=TRUE" >/dev/null
+  --metadata="^~^tee-image-reference=${IMAGE}~tee-container-log-redirect=true~tee-env-AGENT=${AGENT}~tee-env-CONTROL_PLANE_URL=${CONTROL_PLANE_URL}~tee-env-TARGET_PROJECT_ID=${PROJECT}~tee-env-GATEWAY_HOST=${GATEWAY_HOST:-agents.agent-attest.internal}~tee-env-PUBLIC_URL=https://${AGENT}.${GATEWAY_HOST:-agents.agent-attest.internal}~tee-env-GOOGLE_CLOUD_PROJECT=${PROJECT}~tee-env-GOOGLE_CLOUD_LOCATION=${REGION}~tee-env-GOOGLE_GENAI_USE_VERTEXAI=TRUE" >/dev/null
 echo " launched"
 
 hr "Waiting for the heartbeat to catch it"
