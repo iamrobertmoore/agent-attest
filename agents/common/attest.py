@@ -121,13 +121,47 @@ def fetch_attestation_token(nonce: str, audience: str = AUDIENCE) -> str:
     return raw
 
 
+METADATA_ID_TOKEN = (
+    "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/"
+    "default/identity?audience="
+)
+
+
+def _id_token(audience: str) -> Optional[str]:
+    """
+    A Google-signed ID token for calling the control plane.
+
+    This is authentication, and it is a completely separate question from attestation.
+    The ID token says which service account is calling. The attestation token says what
+    code is running. Conflating them is the mistake this whole project is about: the
+    control plane needs both, because either alone admits something it should not.
+
+    Without it the control plane would have to be a public endpoint, and it holds the
+    only agentregistry.services.create permission in the project.
+    """
+    req = urlrequest.Request(
+        METADATA_ID_TOKEN + urlrequest.quote(audience, safe=""),
+        headers={"Metadata-Flavor": "Google"},
+    )
+    try:
+        with urlrequest.urlopen(req, timeout=5.0) as resp:
+            return resp.read().decode().strip()
+    except Exception as e:  # noqa: BLE001
+        log.debug("no metadata ID token available (%s); calling unauthenticated", e)
+        return None
+
+
 def _post(path: str, payload: dict[str, Any], timeout: float = 15.0) -> dict[str, Any]:
     if not CONTROL_PLANE_URL:
         raise RuntimeError("CONTROL_PLANE_URL is not set.")
+    headers = {"content-type": "application/json"}
+    token = _id_token(CONTROL_PLANE_URL)
+    if token:
+        headers["authorization"] = f"Bearer {token}"
     req = urlrequest.Request(
         f"{CONTROL_PLANE_URL}{path}",
         data=json.dumps(payload).encode(),
-        headers={"content-type": "application/json"},
+        headers=headers,
         method="POST",
     )
     try:
