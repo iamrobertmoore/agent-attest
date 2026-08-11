@@ -64,6 +64,36 @@ if [ "${SKIP_BUILD:-}" != "true" ]; then
       exit 1 ;;
     *) echo "   single image, good" ;;
   esac
+
+  # Boot it locally before spending a VM on it.
+  #
+  # A Confidential Space VM that fails at startup tells you almost nothing: it reports
+  # RUNNING, then TERMINATED, and the logs never leave the machine because the container
+  # died before the launcher attached anything to it. Every failure looks like silence.
+  #
+  # Twenty seconds here replaces a four-minute cycle that ends in no information. This
+  # is how the missing sse-starlette dependency was eventually found, after three VMs.
+  echo "== booting the image locally to check it starts at all"
+  if ! docker run --rm --platform linux/amd64 \
+        -e AGENT="${AGENT}" -e SKIP_ATTESTATION=true \
+        -e TARGET_PROJECT_ID="${PROJECT}" \
+        -e GATEWAY_HOST=example.invalid \
+        -e CONTROL_PLANE_URL=https://example.invalid \
+        "${IMAGE}" > /tmp/agent-attest-smoke.log 2>&1 &
+  then :; fi
+  smoke_pid=$!
+  sleep 25
+  kill "${smoke_pid}" 2>/dev/null || true
+  if grep -qE "Application startup complete|Uvicorn running" /tmp/agent-attest-smoke.log; then
+    echo "   started cleanly"
+  else
+    echo "   ERROR: the container did not reach a running server. Last lines:"
+    tail -25 /tmp/agent-attest-smoke.log | sed 's/^/     /'
+    echo
+    echo "   Full log: /tmp/agent-attest-smoke.log"
+    echo "   Not launching a VM against an image that cannot start."
+    exit 1
+  fi
 fi
 
 # Allow the agent's service account to invoke the control plane. Least privilege, per
