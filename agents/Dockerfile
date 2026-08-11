@@ -15,7 +15,19 @@ COPY . ./
 # tee.launch_policy.log_redirect defaults to debugonly, and passing
 # tee-container-log-redirect=true at launch does nothing unless the image carries it.
 LABEL "tee.launch_policy.log_redirect"="always"
-LABEL "tee.launch_policy.allow_env_override"="AGENT,PORT,PUBLIC_URL,CONTROL_PLANE_URL,GATEWAY_HOST,TARGET_PROJECT_ID,EXECUTOR_ARMED,MODEL"
+# The launch policy allowlist. An env var passed at launch that is NOT named here is
+# refused by the launcher, which then kills the workload and logs "Workload completed",
+# wording that reads like success. The real line is above it:
+#   "env var {X} is not allowed to be overridden on this image"
+#
+# This is a security control, not a nuisance: it stops whoever creates the VM from
+# altering the behaviour of an image someone else approved. Which is the same problem
+# agent-attest exists to solve, one layer down, so it deserves respect rather than a
+# wildcard.
+#
+# Vertex needs GOOGLE_CLOUD_PROJECT, GOOGLE_CLOUD_LOCATION and GOOGLE_GENAI_USE_VERTEXAI,
+# so they are declared explicitly.
+LABEL "tee.launch_policy.allow_env_override"="AGENT,PORT,PUBLIC_URL,CONTROL_PLANE_URL,GATEWAY_HOST,TARGET_PROJECT_ID,EXECUTOR_ARMED,MODEL,GOOGLE_CLOUD_PROJECT,GOOGLE_CLOUD_LOCATION,GOOGLE_GENAI_USE_VERTEXAI"
 
 ENV PORT=8080
 EXPOSE 8080

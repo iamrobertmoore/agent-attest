@@ -73,6 +73,24 @@ if [ "${SKIP_BUILD:-}" != "true" ]; then
   #
   # Twenty seconds here replaces a four-minute cycle that ends in no information. This
   # is how the missing sse-starlette dependency was eventually found, after three VMs.
+  # Every tee-env- we pass must appear in the image's allow_env_override label, or the
+  # launcher refuses the workload and reports "Workload completed", which reads like
+  # success. Checking here turns a four-minute silent failure into a one-line message.
+  echo "== checking launch policy allows every env var we pass"
+  allowed="$(docker inspect --format '{{ index .Config.Labels "tee.launch_policy.allow_env_override" }}' "${IMAGE}" 2>/dev/null || true)"
+  echo "   image allows: ${allowed}"
+  missing=""
+  for v in AGENT CONTROL_PLANE_URL TARGET_PROJECT_ID GATEWAY_HOST EXECUTOR_ARMED \
+           GOOGLE_CLOUD_PROJECT GOOGLE_CLOUD_LOCATION GOOGLE_GENAI_USE_VERTEXAI; do
+    case ",${allowed}," in *",${v},"*) ;; *) missing="${missing} ${v}" ;; esac
+  done
+  if [ -n "${missing}" ]; then
+    echo "   ERROR: launch would pass env vars the image does not permit:${missing}"
+    echo "   Add them to tee.launch_policy.allow_env_override in agents/Dockerfile."
+    exit 1
+  fi
+  echo "   all permitted"
+
   echo "== booting the image locally to check it starts at all"
   if ! docker run --rm --platform linux/amd64 \
         -e AGENT="${AGENT}" -e SKIP_ATTESTATION=true \
