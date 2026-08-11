@@ -174,7 +174,10 @@ Two things make it worse together:
 
 - `gcloud run services describe --format='value(status.url)'` can return a legacy-format
   hostname that does not route, while `gcloud run services list` returns the canonical
-  one. So there genuinely are wrong hostnames in circulation.
+  one. So there genuinely are wrong hostnames in circulation. **`gcloud run services
+  proxy` reads `status.url`**, so even a correctly authenticated proxy 404s against a
+  service whose `status.url` is stale. That is worth knowing before concluding an app is
+  broken: a proxy failure is not evidence about the container.
 - `gcloud auth print-identity-token` with no `--audiences` mints a token audienced to
   gcloud's own OAuth client, which Cloud Run rejects. So even the right hostname 404s.
 

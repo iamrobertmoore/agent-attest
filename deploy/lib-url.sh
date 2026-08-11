@@ -23,13 +23,23 @@ resolve_control_plane_url () {
   local service="${1:-agent-attest-control}" region="${2:-us-central1}" project="${3:-agent-attest-2026}"
   local candidates url code token
 
+  # ORDER MATTERS, and must not be left to sort(1).
+  #
+  # `gcloud run services list` reports the hostname that actually routes. `describe`
+  # can report a stale legacy host in status.url that resolves but 404s at the Google
+  # frontend, and gcloud's own `run services proxy` uses that stale value, so even a
+  # correctly authenticated proxy fails against it.
+  #
+  # An earlier version piped both through `sort -u`, which happened to put the right one
+  # first only because a digit sorts before a letter. Deduplicate while preserving order
+  # instead, so the correct URL is first by intent rather than by luck.
   candidates="$(
     {
       gcloud run services list --region="${region}" --project="${project}" \
         --filter="metadata.name=${service}" --format='value(status.url)' 2>/dev/null
       gcloud run services describe "${service}" --region="${region}" --project="${project}" \
         --format='value(status.url,status.urls)' 2>/dev/null | tr ';,\t' '\n'
-    } | grep '^https://' | sort -u
+    } | grep '^https://' | awk '!seen[$0]++'
   )"
 
   if [ -z "${candidates}" ]; then
