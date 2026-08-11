@@ -24,9 +24,14 @@ VM="agent-attest-${AGENT}"
 SA="agent-attest-${AGENT}@${PROJECT}.iam.gserviceaccount.com"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
-CONTROL_PLANE_URL="${CONTROL_PLANE_URL:-$(gcloud run services describe agent-attest-control \
-  --region="${REGION}" --project="${PROJECT}" --format='value(status.url)')}"
-[ -n "${CONTROL_PLANE_URL}" ] || { echo "control plane not deployed"; exit 1; }
+# shellcheck source=deploy/lib-url.sh
+. "$(dirname "$0")/lib-url.sh"
+# Resolved and PROVEN before launching a VM. The agent fails closed on a bad URL, and
+# the resulting log line says "cannot attest", which points at the TEE rather than at
+# the typo that actually caused it.
+CONTROL_PLANE_URL="${CONTROL_PLANE_URL:-$(resolve_control_plane_url agent-attest-control "${REGION}" "${PROJECT}")}"
+[ -n "${CONTROL_PLANE_URL}" ] || { echo "control plane URL could not be resolved"; exit 1; }
+echo "== control plane: ${CONTROL_PLANE_URL}"
 
 if [ "${SKIP_BUILD:-}" != "true" ]; then
   echo "== building ${IMAGE}"

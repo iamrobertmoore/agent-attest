@@ -34,9 +34,10 @@ gcloud run deploy agent-attest-control \
   --memory=512Mi \
   --set-env-vars="PROJECT_ID=${PROJECT},LOCATION=${REGION}"
 
-URL="$(gcloud run services describe agent-attest-control --region="${REGION}" --format='value(status.url)')"
+# shellcheck source=deploy/lib-url.sh
+. "$(dirname "$0")/lib-url.sh"
+echo "== resolving a URL that actually answers"
+URL="$(resolve_control_plane_url agent-attest-control "${REGION}" "${PROJECT}")"
 echo
 echo "CONTROL_PLANE_URL=${URL}"
-echo
-echo "Smoke test (as yourself):"
-echo "  curl -H \"Authorization: Bearer \$(gcloud auth print-identity-token)\" ${URL}/healthz"
+echo "   verified: GET /healthz returned 200"
