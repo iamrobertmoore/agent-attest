@@ -144,10 +144,19 @@ if gcloud beta network-services agent-gateways describe agent-attest-gw \
      --project="${PROJECT}" --location="${REGION}" >/dev/null 2>&1; then
   ok "gateway already exists"
 else
+  # Schema recovered from the import validator's own error output, which dumps the full
+  # JSON schema. Top-level `network` / `subnetwork` are rejected (additionalProperties
+  # false); the network lives under networkConfig, and `protocols` is required.
+  #
+  # NOTE THE ENUM: protocols accepts only MCP or PROTOCOL_UNSPECIFIED. There is no A2A
+  # value. See docs/GATEWAY.md.
   cat > /tmp/agent-gateway.yaml <<YAML
 name: agent-attest-gw
-network: projects/${PROJECT}/global/networks/${NET}
-subnetwork: projects/${PROJECT}/regions/${REGION}/subnetworks/${SUBNET}
+protocols:
+  - MCP
+googleManaged: {}
+registries:
+  - //agentregistry.googleapis.com/projects/${PROJECT}/locations/${REGION}
 YAML
   echo "   importing (errors shown in full, on purpose)"
   gcloud beta network-services agent-gateways import agent-attest-gw \

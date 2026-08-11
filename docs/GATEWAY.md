@@ -215,3 +215,48 @@ and each agent registers its own gateway-fronted URL.
 
 Worth reporting to Google: documenting the uniqueness constraint on `interfaces[].url`
 would have made this a one-line fix instead of an afternoon.
+
+## Platform finding: Agent Gateway does not speak A2A
+
+The `agent-gateways import` validator rejects an incomplete document by printing its full
+JSON schema, which is the most useful error message in the entire platform. It contains:
+
+```
+'protocols': {'description': 'List of protocols supported by an Agent Gateway',
+              'items': {'enum': ['MCP', 'PROTOCOL_UNSPECIFIED'],
+                        'type': 'string'},
+              'type': 'array'},
+```
+
+**Two values, and neither is A2A.**
+
+This matters for anything built the way the Fortified Enterprise Fleet track describes.
+ADK's own inter-agent transport is A2A: `RemoteA2aAgent` on the calling side, `to_a2a()`
+on the serving side, agent cards at `/.well-known/`. That is the documented way to build a
+fleet where agents delegate to each other over the network.
+
+Agent Gateway governs MCP traffic. So at the time of writing, the gateway cannot sit in
+front of agent-to-agent calls in an ADK fleet, only in front of MCP tool and server calls.
+The track text pairs "Agent Gateway (for unified routing and policy enforcement)" with
+building "a scalable network of institutional agents", and those two things do not yet
+meet.
+
+Also worth noting from the same schema dump, since none of it appears in the prose docs:
+
+- top-level `network` and `subnetwork` are rejected; `additionalProperties` is false and
+  networking belongs under `networkConfig`
+- `googleManaged` versus `selfManaged` is a required choice of posture: a Google-run proxy
+  in a tenant project, or attachment to an existing Application Load Balancer or Secure
+  Web Proxy
+- `registries` binds a gateway to Agent Registry with the unusual
+  `//agentregistry.googleapis.com/projects/{p}/locations/{l}` form
+
+**What this means for agent-attest.** The enforcement design does not change. The
+authorization extension is a real registered resource, it speaks Envoy `ext_authz` v3, and
+the decision it serves is the same `POST /authorize` the control plane already answers. If
+the gateway can be created for MCP it demonstrates the binding; if A2A support arrives, the
+same extension applies to inter-agent hops with no code change, because the callout holds
+no policy of its own.
+
+The honest claim is therefore: the extension is registered and exercised, and the gateway
+binding covers the protocol Google currently supports.
