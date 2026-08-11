@@ -99,14 +99,56 @@ async function createService(input: RegisterAgentInput): Promise<RegisteredServi
     );
   }
 
-  // The response is an Operation whose metadata carries the target resource name.
+  // services.create returns a LONG-RUNNING OPERATION, and accepting it is not the same
+  // as the service existing.
+  //
+  // An earlier version returned here on the strength of a 200 and a resource name from
+  // the operation metadata. Three agents were then recorded in Firestore as admitted
+  // while their Agent Registry entries did not exist, because the operation had failed
+  // asynchronously and nothing was watching. The admission record claimed a registry
+  // entry that was never created, which is precisely the kind of quiet divergence this
+  // project exists to prevent, sitting inside the project itself.
+  //
+  // So: poll to completion, and treat a failed operation as a failed registration.
   const op = (await res.json()) as {
     name?: string;
+    done?: boolean;
+    error?: { message?: string };
     metadata?: { target?: string };
     response?: { name?: string };
   };
-  const name = op.response?.name ?? op.metadata?.target ?? `${parent}/services/${input.serviceId}`;
-  return { name };
+
+  const expected = `${parent}/services/${input.serviceId}`;
+  if (op.done) {
+    if (op.error) throw new Error(`Agent Registry create failed: ${op.error.message}`);
+    return { name: op.response?.name ?? expected };
+  }
+  if (!op.name) {
+    throw new Error("Agent Registry returned neither a completed result nor an operation name.");
+  }
+
+  // ~20s budget. Registration is a startup-path call, not a request-path one, so waiting
+  // is cheap; being wrong about whether it succeeded is not.
+  for (let i = 0; i < 20; i++) {
+    await new Promise((r) => setTimeout(r, 1000));
+    const poll = await authedFetch(`${AGENT_REGISTRY_HOST}/${op.name}`);
+    if (!poll.ok) continue;
+    const state = (await poll.json()) as {
+      done?: boolean;
+      error?: { message?: string };
+      response?: { name?: string };
+    };
+    if (!state.done) continue;
+    if (state.error) {
+      throw new Error(`Agent Registry create failed: ${state.error.message}`);
+    }
+    return { name: state.response?.name ?? expected };
+  }
+
+  throw new Error(
+    `Agent Registry create did not complete within 20s (operation ${op.name}). ` +
+      `Refusing to record an admission that claims a registry entry which may not exist.`,
+  );
 }
 
 /**

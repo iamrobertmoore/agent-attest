@@ -136,29 +136,34 @@ gcloud beta service-extensions authz-extensions import agent-attest-authz \
   --project="${PROJECT}" --source=/tmp/authz-extension.yaml --location="${REGION}"
 
 step "Agent Gateway"
-# Do NOT swallow this. An earlier version had `2>/dev/null || ok "gateway exists"`, which
-# reported success for a gateway that had never been created, and the failure surfaced
-# two steps later as "AgentGateway does not exist" from the policy import. Hiding stderr
-# behind an idempotency message turns a clear error into a confusing one.
+# There is no `create` verb. `gcloud beta network-services agent-gateways` offers only
+# delete, describe, export, import and list, so a gateway is created declaratively by
+# importing a YAML document. Google's own docs show `create` in prose, which is how the
+# earlier version of this script came to call a command that does not exist.
 if gcloud beta network-services agent-gateways describe agent-attest-gw \
      --project="${PROJECT}" --location="${REGION}" >/dev/null 2>&1; then
   ok "gateway already exists"
 else
-  echo "   creating (errors shown in full, on purpose)"
-  gcloud beta network-services agent-gateways create agent-attest-gw \
-    --project="${PROJECT}" --location="${REGION}" \
-    --network="${NET}" --subnetwork="${SUBNET}" || {
+  cat > /tmp/agent-gateway.yaml <<YAML
+name: agent-attest-gw
+network: projects/${PROJECT}/global/networks/${NET}
+subnetwork: projects/${PROJECT}/regions/${REGION}/subnetworks/${SUBNET}
+YAML
+  echo "   importing (errors shown in full, on purpose)"
+  gcloud beta network-services agent-gateways import agent-attest-gw \
+    --project="${PROJECT}" --location="${REGION}" --source=/tmp/agent-gateway.yaml || {
       cat <<'HINT'
 
-   The gateway was not created, so the policy binding below cannot work.
+   Gateway import failed, so the policy binding below cannot work.
 
-   This is the step most likely to be gated or to want different flags than the docs
-   show. Read the error above rather than working around it, and check:
-     gcloud beta network-services agent-gateways create --help
+   Check the schema this gcloud build expects:
+     gcloud beta network-services agent-gateways import --help
+   And, if any gateway exists anywhere to copy the shape from:
+     gcloud beta network-services agent-gateways export NAME --location=REGION
 
-   If Agent Gateway is unavailable on this account, the fallback needs no code: the
-   same decision is served by POST /authorize on the control plane, and the callout
-   holds no policy of its own. See docs/GATEWAY.md.
+   If Agent Gateway cannot be created on this account, nothing else is wasted. The
+   authzExtension is a real resource, and the decision it serves is POST /authorize on
+   the control plane, which already works. See docs/GATEWAY.md.
 HINT
       exit 1
     }
