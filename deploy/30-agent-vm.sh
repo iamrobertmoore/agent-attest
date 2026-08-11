@@ -102,7 +102,22 @@ if [ "${SKIP_BUILD:-}" != "true" ]; then
   # `docker inspect --format={{.Id}}` returns and what the build log prints as
   # "exporting config sha256:...". It is NOT the manifest digest `docker push` prints.
   # They differ, and using the wrong one gives an allowlist that never matches.
-  CONFIG_DIGEST="$(docker inspect --format='{{.Id}}' "${IMAGE}")"
+  # Read the CONFIG blob digest out of the manifest.
+  #
+  # `docker inspect --format={{.Id}}` is NOT it. On Docker Desktop's containerd image
+  # store that returns the MANIFEST digest, the same value `docker push` prints, and it
+  # does not match image_id. Both are sha256 and both look plausible in a log line, which
+  # is what makes this worth doing explicitly rather than conveniently.
+  #
+  # Confirmed against a real token: a capture whose build logged
+  # "exporting config sha256:6d9033aa..." produced image_id sha256:6d9033aa..., while
+  # its push printed a completely different manifest digest.
+  CONFIG_DIGEST="$(docker manifest inspect "${IMAGE}" \
+    | python3 -c 'import json,sys; print(json.load(sys.stdin)["config"]["digest"])')"
+  case "${CONFIG_DIGEST}" in
+    sha256:*) ;;
+    *) echo "   ERROR: could not read a config digest (got '${CONFIG_DIGEST}')"; exit 1 ;;
+  esac
   echo "== approving digest for admission"
   echo "   ${CONFIG_DIGEST}"
   curl -s -X PATCH \
