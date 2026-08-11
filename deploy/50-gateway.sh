@@ -136,8 +136,33 @@ gcloud beta service-extensions authz-extensions import agent-attest-authz \
   --project="${PROJECT}" --source=/tmp/authz-extension.yaml --location="${REGION}"
 
 step "Agent Gateway"
-gcloud beta network-services agent-gateways create agent-attest-gw \
-  --project="${PROJECT}" --location="${REGION}" 2>/dev/null || ok "gateway exists"
+# Do NOT swallow this. An earlier version had `2>/dev/null || ok "gateway exists"`, which
+# reported success for a gateway that had never been created, and the failure surfaced
+# two steps later as "AgentGateway does not exist" from the policy import. Hiding stderr
+# behind an idempotency message turns a clear error into a confusing one.
+if gcloud beta network-services agent-gateways describe agent-attest-gw \
+     --project="${PROJECT}" --location="${REGION}" >/dev/null 2>&1; then
+  ok "gateway already exists"
+else
+  echo "   creating (errors shown in full, on purpose)"
+  gcloud beta network-services agent-gateways create agent-attest-gw \
+    --project="${PROJECT}" --location="${REGION}" \
+    --network="${NET}" --subnetwork="${SUBNET}" || {
+      cat <<'HINT'
+
+   The gateway was not created, so the policy binding below cannot work.
+
+   This is the step most likely to be gated or to want different flags than the docs
+   show. Read the error above rather than working around it, and check:
+     gcloud beta network-services agent-gateways create --help
+
+   If Agent Gateway is unavailable on this account, the fallback needs no code: the
+   same decision is served by POST /authorize on the control plane, and the callout
+   holds no policy of its own. See docs/GATEWAY.md.
+HINT
+      exit 1
+    }
+fi
 
 step "Bind the policy to the gateway"
 cat > /tmp/authz-policy.yaml <<YAML
