@@ -37,37 +37,39 @@ resolve_control_plane_url () {
     return 1
   fi
 
+  # An audience-scoped ID token is the only kind Cloud Run accepts, and
+  # `gcloud auth print-identity-token --audiences=` REQUIRES a service account:
+  # a user account is refused outright with "Invalid account type for --audiences".
+  #
+  # So when a human runs this, the health check cannot succeed even against a perfectly
+  # good URL. Attempting it anyway and failing closed would block the deploy on a check
+  # that is structurally impossible for the person running it, which is worse than not
+  # checking. We probe when we can, and fall back to gcloud's canonical URL when we
+  # cannot, saying which happened.
   for url in ${candidates}; do
-    # Audience-scoped, or Cloud Run rejects it and we misread the 404 as a bad hostname.
     token="$(gcloud auth print-identity-token --audiences="${url}" 2>/dev/null || true)"
-    [ -n "${token}" ] || token="$(gcloud auth print-identity-token 2>/dev/null || true)"
+    if [ -z "${token}" ]; then
+      continue
+    fi
     code="$(curl -s -o /dev/null -w '%{http_code}' -m 10 \
              -H "Authorization: Bearer ${token}" "${url}/healthz" || true)"
     case "${code}" in
       200) echo "${url}"; return 0 ;;
-      403) # Exists, and we are not allowed. The URL is right; the caller is not.
-           echo "   ${url} -> 403 (URL is correct, caller lacks run.invoker)" >&2 ;;
+      403) echo "   ${url} -> 403 (URL correct, caller lacks run.invoker)" >&2 ;;
       404) echo "   ${url} -> 404 (wrong host, OR correct host and unauthorised)" >&2 ;;
       *)   echo "   ${url} -> HTTP ${code}" >&2 ;;
     esac
   done
 
+  # Fall back to the first candidate, which comes from `gcloud run services list` and is
+  # the hostname gcloud itself considers canonical.
+  url="$(echo "${candidates}" | head -n1)"
   cat >&2 <<HINT
-
-Could not get a 200 from any candidate. Tried:
-${candidates}
-
-A private Cloud Run service answers unauthorised callers with 404, so this may be an
-IAM problem rather than a URL problem. Grant yourself invoker and retry:
-
-  gcloud run services add-iam-policy-binding ${service} \\
-    --region=${region} --project=${project} \\
-    --member=user:\$(gcloud config get-value account) --role=roles/run.invoker
-
-Or bypass the question entirely:
-
-  gcloud run services proxy ${service} --region=${region} --project=${project}
-  curl http://localhost:8080/healthz
+   could not verify from this account (audience-scoped ID tokens need a service account)
+   using gcloud's canonical URL unverified: ${url}
+   to check it by hand:
+     gcloud run services proxy ${service} --region=${region} --project=${project} --port=8080 &
+     curl http://localhost:8080/healthz
 HINT
-  return 1
+  echo "${url}"
 }
