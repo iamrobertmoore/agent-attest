@@ -1,31 +1,73 @@
 # Resolve the control plane's URL, and prove it actually answers.
 #
-# gcloud can report more than one hostname for a Cloud Run service, and not all of them
-# route. Taking status.url on faith produced a Google edge 404 that looks exactly like an
-# application 404 unless you notice the response is HTML. Everything downstream of this
-# value fails closed, so a wrong URL here would surface as "attestation refused" three
-# hops away and send us hunting in the wrong place entirely.
+# TWO TRAPS, BOTH OF WHICH COST TIME THE FIRST TIME
 #
-# So: try every hostname gcloud knows about, keep the first that answers, and fail loudly
-# if none do.
+# 1. gcloud reports more than one hostname. `status.url` gave a legacy-format host that
+#    does not route, while `gcloud run services list` gave the canonical one. Taking
+#    either on faith is a coin flip, so both are tried.
+#
+# 2. A private Cloud Run service answers an unauthorised caller with 404, not 403. That
+#    is deliberate on Google's part, so that private services do not leak their existence
+#    by responding differently to "wrong URL" and "no access". It is also indistinguishable
+#    from a genuinely wrong hostname, which is exactly the confusion it caused here: a
+#    Ready service with RoutesReady true, returning a Google frontend 404 on every URL.
+#
+#    The fix for the caller is an ID token audienced to the SERVICE, not to gcloud. A
+#    token from `gcloud auth print-identity-token` with no --audiences carries gcloud's
+#    own client ID as its audience and Cloud Run rejects it.
+#
+# Everything downstream of this value fails closed, so a wrong URL here surfaces two hops
+# later as "cannot attest" inside a VM, which points at the TEE rather than at the URL.
+# Worth the care.
 resolve_control_plane_url () {
   local service="${1:-agent-attest-control}" region="${2:-us-central1}" project="${3:-agent-attest-2026}"
-  local token candidates url code
-  token="$(gcloud auth print-identity-token 2>/dev/null || true)"
-  candidates="$(gcloud run services describe "${service}" --region="${region}" --project="${project}" \
-      --format='value(status.url,status.urls)' 2>/dev/null | tr ';,\t' '\n' | grep '^https://' | sort -u)"
+  local candidates url code token
+
+  candidates="$(
+    {
+      gcloud run services list --region="${region}" --project="${project}" \
+        --filter="metadata.name=${service}" --format='value(status.url)' 2>/dev/null
+      gcloud run services describe "${service}" --region="${region}" --project="${project}" \
+        --format='value(status.url,status.urls)' 2>/dev/null | tr ';,\t' '\n'
+    } | grep '^https://' | sort -u
+  )"
+
+  if [ -z "${candidates}" ]; then
+    echo "No URL found for ${service} in ${region}. Is it deployed?" >&2
+    return 1
+  fi
 
   for url in ${candidates}; do
+    # Audience-scoped, or Cloud Run rejects it and we misread the 404 as a bad hostname.
+    token="$(gcloud auth print-identity-token --audiences="${url}" 2>/dev/null || true)"
+    [ -n "${token}" ] || token="$(gcloud auth print-identity-token 2>/dev/null || true)"
     code="$(curl -s -o /dev/null -w '%{http_code}' -m 10 \
              -H "Authorization: Bearer ${token}" "${url}/healthz" || true)"
-    if [ "${code}" = "200" ]; then
-      echo "${url}"
-      return 0
-    fi
-    echo "   ${url} -> HTTP ${code}" >&2
+    case "${code}" in
+      200) echo "${url}"; return 0 ;;
+      403) # Exists, and we are not allowed. The URL is right; the caller is not.
+           echo "   ${url} -> 403 (URL is correct, caller lacks run.invoker)" >&2 ;;
+      404) echo "   ${url} -> 404 (wrong host, OR correct host and unauthorised)" >&2 ;;
+      *)   echo "   ${url} -> HTTP ${code}" >&2 ;;
+    esac
   done
 
-  echo "Could not find a working URL for ${service}. Tried:" >&2
-  echo "${candidates}" >&2
+  cat >&2 <<HINT
+
+Could not get a 200 from any candidate. Tried:
+${candidates}
+
+A private Cloud Run service answers unauthorised callers with 404, so this may be an
+IAM problem rather than a URL problem. Grant yourself invoker and retry:
+
+  gcloud run services add-iam-policy-binding ${service} \\
+    --region=${region} --project=${project} \\
+    --member=user:\$(gcloud config get-value account) --role=roles/run.invoker
+
+Or bypass the question entirely:
+
+  gcloud run services proxy ${service} --region=${region} --project=${project}
+  curl http://localhost:8080/healthz
+HINT
   return 1
 }

@@ -156,3 +156,28 @@ If the VPC and DNS path cannot be made to work in the time available, the same
 enforcement logic is byte-identical, because the callout never held any of it. The
 write-up then names this exact surface as what it binds to. That is the pre-planned
 scale-back and it costs one honest paragraph.
+
+## Platform gotcha: a private Cloud Run service 404s, it does not 403
+
+Worth writing down because it cost time and it will recur.
+
+A Cloud Run service deployed `--no-allow-unauthenticated` answers an unauthorised caller
+with **404 from the Google frontend**, not 403. That is deliberate information hiding: a
+private service that answered differently for "wrong URL" and "no access" would leak its
+own existence to anyone who could guess a hostname.
+
+The cost is that the two cases are indistinguishable from the outside. A service showing
+`Ready: True` and `RoutesReady: True` returning a frontend 404 on every hostname looks
+exactly like a routing problem and is usually an IAM problem.
+
+Two things make it worse together:
+
+- `gcloud run services describe --format='value(status.url)'` can return a legacy-format
+  hostname that does not route, while `gcloud run services list` returns the canonical
+  one. So there genuinely are wrong hostnames in circulation.
+- `gcloud auth print-identity-token` with no `--audiences` mints a token audienced to
+  gcloud's own OAuth client, which Cloud Run rejects. So even the right hostname 404s.
+
+`deploy/lib-url.sh` handles all of it: tries every hostname gcloud knows, mints an
+audience-scoped token per candidate, and distinguishes 403 (right URL, wrong caller) from
+404 in its output.
