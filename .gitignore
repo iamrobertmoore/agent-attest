@@ -12,3 +12,5 @@ tools/attestation-vm/token.jwt
 tools/attestation-vm/.last-nonce
 verifier/package-lock.json.bak
 control-plane/dist/
+__pycache__/
+*.pyc
