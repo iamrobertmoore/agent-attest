@@ -168,29 +168,69 @@ gcloud artifacts repositories add-iam-policy-binding "${REPO}" \
 gcloud --quiet compute instances delete "${VM}" --project="${PROJECT}" \
   --zone="$(cat "${ROOT}/deploy/.zone-${AGENT}" 2>/dev/null || echo us-central1-c)" 2>/dev/null || true
 
+# Zone and machine-type fallback.
+#
+# n2d stockouts hit whole regions, not single zones: all four us-central1 zones refused
+# a n2d-standard-2 within the same minute. Confidential Space needs an AMD SEV capable
+# machine, which is the n2d family, so the only ways out are another size (a different
+# capacity pool) or another region.
+#
+# Agents may live outside us-central1 and still register into the us-central1 Agent
+# Registry; the control plane's LOCATION is what decides where the Service resource goes,
+# not where the VM runs.
+ZONES="${ZONES:-us-central1-c us-central1-a us-central1-b us-central1-f \
+                 us-east1-b us-east1-c us-east1-d \
+                 us-east4-a us-east4-b \
+                 us-west1-a us-west1-b \
+                 europe-west4-a europe-west4-b}"
+MACHINES="${MACHINES:-n2d-standard-2 n2d-standard-4}"
+
 launched=0
-for z in us-central1-c us-central1-a us-central1-b us-central1-f; do
-  echo "== launching ${VM} in ${z}"
-  if gcloud --quiet compute instances create "${VM}" \
-      --project="${PROJECT}" --zone="${z}" \
-      --machine-type=n2d-standard-2 \
-      --confidential-compute-type=SEV \
-      --min-cpu-platform="AMD Milan" \
-      --maintenance-policy=MIGRATE \
-      --shielded-secure-boot \
-      --scopes=cloud-platform \
-      --service-account="${SA}" \
-      --image-project=confidential-space-images \
-      --image-family=confidential-space \
-      --metadata="^~^tee-image-reference=${IMAGE}~tee-container-log-redirect=true~tee-env-AGENT=${AGENT}~tee-env-CONTROL_PLANE_URL=${CONTROL_PLANE_URL}~tee-env-TARGET_PROJECT_ID=${PROJECT}~tee-env-GATEWAY_HOST=${GATEWAY_HOST:-agents.agent-attest.internal}~tee-env-PUBLIC_URL=https://${AGENT}.${GATEWAY_HOST:-agents.agent-attest.internal}~tee-env-EXECUTOR_ARMED=${EXECUTOR_ARMED:-false}~tee-env-GOOGLE_CLOUD_PROJECT=${PROJECT}~tee-env-GOOGLE_CLOUD_LOCATION=${REGION}~tee-env-GOOGLE_GENAI_USE_VERTEXAI=TRUE"
-  then
-    echo "${z}" > "${ROOT}/deploy/.zone-${AGENT}"
-    launched=1
-    break
-  fi
-  echo "   no capacity in ${z}, trying the next zone"
+for machine in ${MACHINES}; do
+  for z in ${ZONES}; do
+    echo "== launching ${VM} in ${z} (${machine})"
+    if gcloud --quiet compute instances create "${VM}" \
+        --project="${PROJECT}" --zone="${z}" \
+        --machine-type="${machine}" \
+        --confidential-compute-type=SEV \
+        --min-cpu-platform="AMD Milan" \
+        --maintenance-policy=MIGRATE \
+        --shielded-secure-boot \
+        --scopes=cloud-platform \
+        --service-account="${SA}" \
+        --image-project=confidential-space-images \
+        --image-family=confidential-space \
+        --metadata="^~^tee-image-reference=${IMAGE}~tee-container-log-redirect=true~tee-env-AGENT=${AGENT}~tee-env-CONTROL_PLANE_URL=${CONTROL_PLANE_URL}~tee-env-TARGET_PROJECT_ID=${PROJECT}~tee-env-GATEWAY_HOST=${GATEWAY_HOST:-agents.agent-attest.internal}~tee-env-PUBLIC_URL=https://${AGENT}.${GATEWAY_HOST:-agents.agent-attest.internal}~tee-env-EXECUTOR_ARMED=${EXECUTOR_ARMED:-false}~tee-env-GOOGLE_CLOUD_PROJECT=${PROJECT}~tee-env-GOOGLE_CLOUD_LOCATION=${REGION}~tee-env-GOOGLE_GENAI_USE_VERTEXAI=TRUE" 2>/tmp/aa-launch-err
+    then
+      echo "${z}" > "${ROOT}/deploy/.zone-${AGENT}"
+      launched=1
+      break 2
+    fi
+    if grep -qE "RESOURCE_POOL_EXHAUSTED|stockout|does not have enough resources" /tmp/aa-launch-err; then
+      echo "   no capacity, next zone"
+    else
+      # Anything that is not a stockout will fail identically everywhere, so stop rather
+      # than working through thirteen zones to collect the same error thirteen times.
+      echo "   launch failed for a reason other than capacity:"
+      cat /tmp/aa-launch-err
+      exit 1
+    fi
+  done
+  echo "== no capacity for ${machine} anywhere, trying a larger size"
 done
-[ "${launched}" = "1" ] || { echo "no capacity in any zone"; exit 1; }
+[ "${launched}" = "1" ] || {
+  cat <<'HINT'
+
+No AMD SEV capacity in any zone or size tried. This is a Google-side stockout, not a
+configuration problem, and it clears on its own. Options:
+
+  - wait ten minutes and re-run, which usually works
+  - widen the search:  ZONES="us-south1-a asia-east1-a" ./deploy/30-agent-vm.sh AGENT
+  - record the video with three agents; the demo needs surveyor and assessor, and the
+    fleet argument is about separation of powers rather than headcount
+HINT
+  exit 1
+}
 
 cat <<NEXT
 
