@@ -274,6 +274,38 @@ generic::cancelled: agent gateway "agent-attest-gw" is not yet provisioned in th
 ```
 
 Nothing in the create response distinguishes created from ready. There is no state field
-to poll, so the only signal is the error text from the operation that needs it. The deploy
-script retries on that specific message for up to twelve minutes and fails immediately on
-anything else, because retrying an unrelated error is how a script hides a real fault.
+to poll, so the only signal is the error text from the operation that needs it.
+
+**And it does not resolve.** The gateway was created at 14:38 and the same error was still
+returned at 18:49, over four hours later. That is not a provisioning delay, and there is no
+way from outside to tell whether tenant provisioning is queued, failed, or requires
+something this project does not have, because the resource reports no state at all.
+
+## Where this leaves enforcement, stated plainly
+
+What exists as real resources on the project:
+
+| Resource | State |
+|---|---|
+| `authzExtensions/agent-attest-authz` | Created. `wireFormat: EXT_AUTHZ_GRPC`, `failOpen` at its safe default. |
+| `agentGateways/agent-attest-gw` | Created. `protocols: [MCP]`, bound to Agent Registry. |
+| VPC, proxy-only subnet, internal ALB, certificate, private DNS | Created. `authz.agent-attest.internal` resolves to `10.10.0.2`. |
+| `gateway-ext` on Cloud Run | Deployed. Verified against Envoy's real `ext_authz` v3 protos. |
+| `authzPolicies/agent-attest-policy` | **Not bound.** Blocked on tenant provisioning that did not complete. |
+
+**The binding would not have governed this fleet anyway.** Agent Gateway's `protocols`
+enum is MCP only. ADK agents talk A2A. So even a successfully bound policy would sit in
+front of MCP tool traffic and never see an inter-agent hop. The two findings compound: the
+gateway cannot be provisioned here, and if it were, it would not cover the transport an
+ADK fleet actually uses.
+
+That makes the fallback the correct architecture today rather than a consolation. The
+authorization decision is served by `POST /authorize` on the control plane, the callout is
+a protocol adapter with no policy of its own, and the decision is identical either way.
+When Agent Gateway supports A2A, binding it requires no code change, because there is no
+policy in the callout to move.
+
+**Do not claim the gateway enforces anything in the submission.** Claim what is true: the
+extension is a registered Google resource, the decision path is live and demonstrable, and
+the binding is blocked by a platform limitation that is documented here with its exact
+error text.

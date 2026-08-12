@@ -25,7 +25,17 @@ authorization extension. The contribution is the admission step in between.
 
 ## Status
 
-Under construction for the All Things Agentic Hackathon.
+Built for the All Things Agentic Hackathon. What is live, and what is not:
+
+| Part | State |
+|---|---|
+| Offline Confidential Space attestation verifier, 20 checks | **Live.** 17 tests against a real production token from a TEE in this project. |
+| Admission into Google's Agent Registry | **Live.** Four agents registered because an attestation verified. |
+| Heartbeat re-attestation, revocation on drift | **Live.** Demonstrated end to end in about 60 seconds. |
+| Browser verification page | **Live.** Recomputes the control plane's verdict client-side. |
+| ADK fleet on Confidential Space | **Live.** Orchestrator plus three specialised workers. |
+| Agent Gateway authorization extension | **Registered.** Real `authzExtension` resource, verified against Envoy `ext_authz` v3. |
+| Gateway policy binding | **Blocked.** See `docs/GATEWAY.md`: tenant provisioning does not complete, and the protocol enum has no A2A. |
 
 ## Architecture
 
