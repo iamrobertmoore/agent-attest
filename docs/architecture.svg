@@ -86,21 +86,26 @@
   <text x="836" y="389" class="h">gateway-ext (Python)</text>
   <text x="836" y="409" class="s">protocol adapter only · no policy · fails closed</text>
 
-  <!-- arrows -->
-  <path class="ln" d="M360 190 L430 160" marker-end="url(#a)"/>
-  <text x="366" y="176" class="lbl">attestation + nonce</text>
+  <!-- arrows. Labels sit on white pills so they mask the line underneath. -->
+  <path class="ln" d="M360 190 L430 162" marker-end="url(#a)"/>
+  <rect x="364" y="166" width="62" height="15" fill="#fff" rx="3"/>
+  <text x="368" y="177" class="lbl">attestation</text>
 
   <path class="ln" d="M750 130 L820 130" marker-end="url(#a)"/>
-  <text x="752" y="122" class="lbl">services.create</text>
+  <rect x="750" y="110" width="66" height="15" fill="#fff" rx="3"/>
+  <text x="753" y="121" class="lbl" font-size="10">services.create</text>
 
   <path class="ln" d="M750 200 L790 200 L790 350 L750 350" marker-end="url(#a)"/>
-  <text x="756" y="286" class="lbl">record</text>
+  <rect x="752" y="182" width="40" height="15" fill="#fff" rx="3"/>
+  <text x="755" y="193" class="lbl">record</text>
 
   <path class="ln" d="M985 342 L985 366" marker-end="url(#a)"/>
-  <text x="992" y="358" class="lbl">gRPC</text>
+  <rect x="990" y="347" width="32" height="15" fill="#fff" rx="3"/>
+  <text x="993" y="358" class="lbl">gRPC</text>
 
   <path class="grn" d="M820 397 L780 397 L780 380 L750 380" marker-end="url(#agrn)"/>
-  <text x="756" y="446" class="lbl" fill="#1e8449">admitted &amp; fresh → ALLOW</text>
+  <rect x="770" y="440" width="146" height="15" fill="#fff" rx="3"/>
+  <text x="773" y="451" class="lbl" fill="#1e8449">admitted &amp; fresh → ALLOW</text>
 
   <!-- browser -->
   <rect x="30" y="470" width="330" height="118" class="ours"/>
@@ -110,7 +115,8 @@
   <text x="46" y="549" class="s">against the pinned root. No account. No trust</text>
   <text x="46" y="565" class="s">in my servers.</text>
   <path class="ln" d="M360 520 L430 400" marker-end="url(#a)"/>
-  <text x="366" y="470" class="lbl">public read</text>
+  <rect x="372" y="452" width="64" height="15" fill="#fff" rx="3"/>
+  <text x="375" y="463" class="lbl">public read</text>
 
   <!-- the event -->
   <rect x="430" y="470" width="720" height="118" fill="#fdf3f2" stroke="#c0392b" stroke-width="1.8" rx="8"/>
