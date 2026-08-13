@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>agent-attest — check the admission for yourself</title>
+<title>agent-attest: check the admission for yourself</title>
 <style>
   :root {
     --bg:#0f1115; --panel:#161a21; --line:#262c36; --ink:#e6e9ef; --dim:#8b95a6;
@@ -62,9 +62,9 @@
     Google root certificate pinned into this page at build time.
   </p>
   <p class="lede">
-    Nothing on this page trusts our servers. The signature check, the certificate chain walk
+    Nothing on this page trusts my servers. The signature check, the certificate chain walk
     and the root comparison all run locally in WebCrypto. The only network call is a public,
-    read-only fetch of the admission record, and if you think we faked that, the cryptography
+    read-only fetch of the admission record, and if you think I faked that, the cryptography
     above it still holds independently.
   </p>
 
@@ -91,8 +91,8 @@
   <h2>2. Live admission records</h2>
   <p class="lede">
     Read straight from Firestore by your browser, unauthenticated. These are deliberately
-    world-readable: an approval only we can read is an assertion, and the point of the project
-    is that approval should be checkable.
+    world-readable: an approval only I can read is just me asserting something, and the point
+    of this is that approval should be checkable.
   </p>
   <div class="panel">
     <div class="row"><button id="refresh" class="ghost">Load admission records</button></div>
@@ -147,7 +147,7 @@ async function run() {
 
   // Inspection mode: evaluate time-based checks at the moment of issue so an expired
   // sample can be examined. The verifier reports this as a caveat rather than hiding it,
-  // because a green tick we arranged for ourselves is worth nothing.
+  // because a green tick I arranged for myself is worth nothing.
   if ($("inspect").checked) {
     try {
       const p = JSON.parse(atob(token.split(".")[1].replace(/-/g,"+").replace(/_/g,"/")));
@@ -179,8 +179,8 @@ async function run() {
   // is wrong in the most alarming possible direction.
   let head;
   if (pass) head = `<div class="verdict ok">Verified</div>`;
-  else if (crypto.length) head = `<div class="verdict bad">Not genuine — ${crypto.length} cryptographic failure(s)</div>`;
-  else head = `<div class="verdict bad">Genuine token, but not admissible — ${failed.length} policy or freshness failure(s)</div>`;
+  else if (crypto.length) head = `<div class="verdict bad">Not genuine. ${crypto.length} cryptographic failure(s)</div>`;
+  else head = `<div class="verdict bad">Genuine token, but not admissible. ${failed.length} policy or freshness failure(s)</div>`;
 
   $("out").innerHTML = head +
     `<p class="det mono">evaluated ${esc(r.evaluatedAt)}</p>` +
