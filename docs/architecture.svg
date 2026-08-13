@@ -22,7 +22,7 @@
     </style>
   </defs>
 
-  <text x="30" y="34" class="h" font-size="19">agent-attest — admission by attestation for Google's Agent Registry</text>
+  <text x="30" y="34" class="h" font-size="19">agent-attest: admission by attestation for Google's Agent Registry</text>
   <text x="30" y="55" class="s">Blue: Google platform.  Green: this project.  Amber: hardware-attested TEE.</text>
 
   <!-- TEE fleet -->
@@ -31,7 +31,7 @@
   <text x="46" y="120" class="s">One image, four agents. Shared digest.</text>
 
   <rect x="46" y="134" width="298" height="46" class="box"/>
-  <text x="58" y="152" class="t">Warden — orchestrator (ADK)</text>
+  <text x="58" y="152" class="t">Warden: orchestrator (ADK)</text>
   <text x="58" y="169" class="s">no cloud access · holds policy + memory</text>
 
   <rect x="46" y="188" width="298" height="42" class="box"/>
@@ -60,12 +60,12 @@
 
   <!-- firestore -->
   <rect x="430" y="300" width="320" height="128" class="ours"/>
-  <text x="446" y="323" class="h">Firestore — world-readable</text>
+  <text x="446" y="323" class="h">Firestore: world-readable</text>
   <text x="446" y="343" class="m">policies/admission → approved digests</text>
   <text x="446" y="361" class="m">agents/{id} → imageDigest, admitted,</text>
   <text x="446" y="377" class="m">   revoked, lastAttestedDigest</text>
   <text x="446" y="395" class="m">agents/{id}/attestations → audit trail</text>
-  <text x="446" y="417" class="s">An approval only we can read is an assertion.</text>
+  <text x="446" y="417" class="s">An approval only I can read is just me asserting it.</text>
 
   <!-- google right -->
   <rect x="820" y="80" width="330" height="120" class="goog"/>
@@ -108,7 +108,7 @@
   <text x="46" y="513" class="s">Same verifier source, unchanged. 65,751 B gzipped.</text>
   <text x="46" y="533" class="s">Paste a token, recompute the verdict locally</text>
   <text x="46" y="549" class="s">against the pinned root. No account. No trust</text>
-  <text x="46" y="565" class="s">in our servers.</text>
+  <text x="46" y="565" class="s">in my servers.</text>
   <path class="ln" d="M360 520 L430 400" marker-end="url(#a)"/>
   <text x="366" y="470" class="lbl">public read</text>
 
@@ -121,8 +121,9 @@
   <text x="448" y="578" class="m" fill="#c0392b">The identity is unchanged and the registry entry is unchanged. The code is not.</text>
 
   <!-- flow strip -->
-  <rect x="30" y="620" width="1120" height="52" fill="#f7f9fb" stroke="#c7d0da" stroke-width="1.2" rx="8"/>
-  <text x="48" y="652" class="t">source → reproducible build → image digest → <tspan font-weight="700">attested by the TEE</tspan> → <tspan font-weight="700">verified offline vs pinned root</tspan> → operator-approved digest → admitted → <tspan font-weight="700">re-proved every 60s</tspan> → enforced on every hop</text>
+  <rect x="30" y="620" width="1120" height="62" fill="#f7f9fb" stroke="#c7d0da" stroke-width="1.2" rx="8"/>
+  <text x="48" y="646" class="t">source → reproducible build → image digest → attested by the TEE → verified offline against the pinned root</text>
+  <text x="48" y="666" class="t">→ operator-approved digest → admitted to Agent Registry → re-proved every 60 seconds → enforced on every hop</text>
 
   <text x="30" y="706" class="s">Attestation proves which image ran. It does not prove that code is correct or safe. Pinning an image pins the code, not the behaviour.</text>
   <text x="30" y="724" class="s">Revocation is not checked: the intermediate's CRL is served without CORS headers, so a browser cannot fetch it.</text>
