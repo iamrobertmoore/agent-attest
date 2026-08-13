@@ -16,7 +16,7 @@ caller ──► Agent Gateway ──ext_authz gRPC──► gateway-ext (Python
                                             admission record
 ```
 
-The callout is a protocol adapter with no policy in it. The decision lives beside the
+The callout is just a protocol adapter. There's no policy in it. The decision lives beside the
 verifier and the admission record, behind `POST /authorize`, so there is exactly one
 implementation of "is this agent allowed". Two implementations would eventually disagree,
 and the day they disagreed one of them would be wrong in the permissive direction.
@@ -37,8 +37,8 @@ the caller is not the workload. So per request the question is:
 > enough that it is still running the code it was admitted under?
 
 The digest comparison happens at heartbeat time, in the control plane, where a token
-genuinely is available. Being precise about this matters, because "the gateway re-checks
-the running measurement on every request" would be an overclaim if said without it.
+genuinely is available. I'm being fussy about this because "the gateway re-checks the running measurement on
+every request" would be an overclaim without the qualifier.
 
 ## Two findings worth stating in the write-up
 
@@ -65,9 +65,8 @@ to the first chunk of body data being processed"*, and connection and header fai
 fail open **regardless of `failOpen`**. Only `REQUEST_AUTHZ` gives a clean fail-closed
 guarantee.
 
-We use `REQUEST_AUTHZ`. We do not need to inspect bodies, so there is nothing to trade
-away, but the choice is deliberate rather than incidental and the alternative would have
-silently undermined the whole design.
+I use `REQUEST_AUTHZ`. I don't need to inspect bodies so nothing is lost, but it's a
+choice I made on purpose, and the other option would have quietly undermined the design.
 
 ## Deriving the target agent
 
@@ -98,9 +97,8 @@ inside the VPC and DNS peering between the gateway project and that VPC. The doc
 note the extension *"doesn't validate the server certificate"*, which is why the VPC
 containment is doing the work.
 
-That is a real infrastructure lift: VPC, internal Application Load Balancer, serverless
-NEG, private DNS zone, peering. It is the single largest schedule risk in the build and
-the reason the plan carries a hard checkpoint before it.
+That's a lot of infrastructure: VPC, internal Application Load Balancer, serverless NEG,
+private DNS zone, peering. It was the biggest schedule risk in the whole build.
 
 Other constraints worth having in one place:
 
@@ -159,7 +157,7 @@ scale-back and it costs one honest paragraph.
 
 ## Platform gotcha: a private Cloud Run service 404s, it does not 403
 
-Worth writing down because it cost time and it will recur.
+Writing this down because it cost me time and it'll happen again.
 
 A Cloud Run service deployed `--no-allow-unauthenticated` answers an unauthorised caller
 with **404 from the Google frontend**, not 403. That is deliberate information hiding: a

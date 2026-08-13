@@ -1,8 +1,8 @@
 # Firestore schema
 
-Admission records are **world-readable by design**. The argument of this project is that
-approval should be checkable rather than asserted, and a record only the control plane can
-read is an assertion. The records contain digests, timestamps and verdicts. They never
+Admission records are **world-readable on purpose**. The whole point is that approval
+should be checkable, and a record only the control plane can read is just me asserting
+something. The records contain digests, timestamps and verdicts. They never
 contain attestation tokens, credentials or nonces that are still live.
 
 Write access belongs to exactly one principal: the admission controller's service account.
@@ -90,10 +90,10 @@ show a digest being approved and revoked without redeploying anything.
 | `requireProductionDebugStatus` | bool | |
 | `freshnessWindowSec` | int | |
 
-`allowedImageDigests` is the operator saying "this exact code may join the fleet". It is a
-separate act from the attestation, which proves the running code IS one of these digests.
-The system needs both. An allowlist without attestation is a database row that anyone who
-can edit the database can satisfy. An attestation without an allowlist is trust-on-first-use:
+`allowedImageDigests` is the operator saying "this exact code may join the fleet". That's
+a separate thing from the attestation, which proves the running code is one of those
+digests. You need both. An allowlist with no attestation is a database row anyone with
+write access can satisfy. An attestation with no allowlist is trust-on-first-use, where
 whoever launches a workload first admits themselves.
 
 **Config digest, not manifest digest.** Confidential Space reports
