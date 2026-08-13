@@ -22,4 +22,13 @@ echo
 ls -l "${OUT}/verifier.js"
 echo "gzipped: $(gzip -c "${OUT}/verifier.js" | wc -c) bytes"
 echo
-echo "Serve locally:  npx -y serve ${OUT}"
+cat <<NEXT
+
+Serve it:
+  cd ${OUT} && python3 -m http.server 3000
+
+Then open http://localhost:3000 and click "Load the committed sample".
+
+python3 rather than npx: it is already installed, needs no confirmation prompt, and logs
+every request, which is what you want when a page looks blank.
+NEXT
