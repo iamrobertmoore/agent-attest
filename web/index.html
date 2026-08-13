@@ -72,8 +72,11 @@
   <div class="panel">
     <textarea id="token" spellcheck="false" placeholder="Paste a Confidential Space PKI attestation token (three dot-separated segments)"></textarea>
     <div class="row">
-      <input id="nonce" style="flex:2;min-width:240px" placeholder="Expected nonce (optional, but omitting it means no replay protection)">
-      <input id="agentId" style="flex:1;min-width:160px" placeholder="Agent id, e.g. surveyor">
+      <input id="nonce" style="flex:1;min-width:220px" placeholder="Expected nonce (omitting it means no replay protection)">
+      <input id="agentId" style="flex:1;min-width:150px" placeholder="Agent id, e.g. surveyor">
+    </div>
+    <div class="row">
+      <input id="imageId" style="flex:1;min-width:340px" placeholder="Approved image digest, sha256:... (this is the operator's approval)">
     </div>
     <div class="row">
       <button id="go">Verify</button>
@@ -133,6 +136,14 @@ async function run() {
   const opts = {};
   const nonce = $("nonce").value.trim();
   if (nonce) opts.expectedNonce = nonce;
+
+  // The digest the operator approved. Without it the verifier refuses to call the result
+  // verified, and it is right to: a token with no image allowlist proves that SOME
+  // workload ran in a genuine TEE, not which one, and that is not a useful security
+  // property. Supplying it here is the same act the control plane performs when it reads
+  // policies/admission.
+  const imageId = $("imageId").value.trim();
+  if (imageId) opts.allowedImageIds = [imageId];
 
   // Inspection mode: evaluate time-based checks at the moment of issue so an expired
   // sample can be examined. The verifier reports this as a caveat rather than hiding it,
@@ -213,6 +224,7 @@ $("sample").onclick = async () => {
   ]);
   $("token").value = t.trim();
   $("nonce").value = m.nonce;
+  $("imageId").value = m.imageId;
   $("inspect").checked = true;
 };
 loadRecords();
