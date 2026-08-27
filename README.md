@@ -21,8 +21,83 @@ running that same digest.
 > against a pinned root → approved digest → admitted → re-proved every 60 seconds
 
 This builds on Google's platform rather than replacing it. Registration goes into the real
-Agent Registry (`agentregistry.googleapis.com`). Enforcement is a real Agent Gateway
-authorization extension. The bit I added is the admission step in between.
+Agent Registry (`agentregistry.googleapis.com`). The enforcement path is a real Agent Gateway
+authorization extension, registered but not yet bound, and the Status table below says exactly
+how far that got. The bit I added is the admission step in between.
+
+## Who I built this for
+
+Not the engineer who wants to run an agent fleet. The person who has to approve it.
+
+Every organisation has someone whose job is to sign off before something touches production.
+They are not on the agent team, they usually can't read the agent's code, and they are the
+reason most of these fleets are still sitting in a staging project. Right now the only
+question they can actually get an answer to is "who deployed this", because that is the only
+question the platform answers. The question they need answered is "what is it running", and
+nobody can tell them.
+
+So they say no. Not out of obstruction, but because saying yes would mean vouching for
+something they have no way of checking.
+
+agent-attest is for that person. It turns an approval they have to take on trust into one
+they can verify themselves, from a browser, with no account and no access to my
+infrastructure. That is why the admission records are world-readable and why the verifier
+runs client-side. An approval only the approver's own vendor can read is not an approval.
+
+## The fleet, and what stops a worker going wrong
+
+Autonomous cloud estate hygiene. Warden orchestrates and holds the policy, Surveyor inventories
+the estate read-only through Cloud Asset Inventory, Assessor reasons about blast radius with no
+estate access whatsoever, and Executor performs one approved removal. Executor is the only
+agent in the project with any mutating permission, and it holds `compute.storageAdmin` rather
+than `compute.admin`, so it can delete a disk and not an instance. No agent holds two of those
+powers, and the split is IAM rather than instruction text. Every grant is in
+`deploy/00-bootstrap.sh`.
+
+Workers are `RemoteA2aAgent`, so every delegation is a network hop that can be checked.
+In-process sub-agents would be simpler and would prove nothing, because the whole claim is
+that admission gets checked on the hop.
+
+What Warden does when a worker misbehaves is in `agents/warden/agent.py`. One of these
+defences is permissions, one is code, and three are instructions to a model. That distinction
+is real and I have labelled it, because an instruction is a request and a permission is not.
+
+- **PERMISSIONS. Assessor cannot act on its own reasoning.** No estate access, so the agent
+  doing the thinking has no way to touch anything. A hallucination there is a wrong opinion
+  and nothing more. Holds even if the model ignores every word of its instruction.
+- **CODE. `before_tool_callback` refuses to delegate to a worker Warden believes is revoked.**
+  `refuse_unadmitted_workers`, on every delegation.
+- **INSTRUCTION. A vague assessment is not an assessment.** Warden is told to accept one only
+  if it cites the same finding id that was sent and reaches an explicit safe or unsafe
+  conclusion with a stated reason, and to discard anything else.
+- **INSTRUCTION. Findings go across verbatim,** since Assessor cannot see the estate and
+  anything paraphrased is information it will never have.
+- **INSTRUCTION. No retries and no routing around a failed worker,** and doing nothing is
+  named as the always-safe branch, because the cost of a wrong deletion is unbounded and the
+  cost of a missed cleanup is a small ongoing bill.
+
+There are two layers of admission checking and today only one of them runs. Warden's
+`before_tool_callback` **fails open on purpose**, because it runs inside the agent whose
+behaviour is in question and anything that compromises Warden removes it. The design puts the
+real check at the gateway, which fails closed and runs somewhere the caller does not control.
+That gateway check is built and registered but never got bound, so the delegation hop is
+currently guarded by the fast-fail callback and by IAM, and not by the gateway. See
+[docs/GATEWAY.md](docs/GATEWAY.md), which does not flatter me.
+
+## Against the Fortified Enterprise Fleet component list
+
+The track names seven platform components. Here is what I actually used, including the ones I
+didn't, because a checklist answered honestly is more useful than one answered generously.
+
+| Component | Used | What I did |
+|---|---|---|
+| **Agent Registry** | yes | Four agents in the real registry, each one there because an attestation verified. This is the centre of the project. |
+| **Agent Identity** | yes, as the subject | The whole entry is an argument about what a SPIFFE ID does and does not prove. It proves where. It does not prove what. |
+| **Agent Gateway** | partly | Real `authzExtension` and gateway resources, verified against Envoy `ext_authz` v3 protos. The policy binding never completed. See [docs/GATEWAY.md](docs/GATEWAY.md). |
+| **Agent Observability** | partly | Append-only, world-readable attestation trail with per-check results on every heartbeat. It is a durable audit log. It is not OpenTelemetry instrumented, and I'm not going to call it that. |
+| **Agent Runtime** | no | The workload has to mint its own hardware attestation, which means it has to be the thing running in the TEE. That rules out a managed runtime for the fleet itself. The control plane does run on Cloud Run. |
+| **Memory Bank** | no | There is no exemption store. Warden's instruction tells it to check its memory before acting on a resource a human has exempted, and nothing implements that memory. I found that writing this table rather than designing it in. The state that genuinely has to survive weeks is the admission and attestation record, and that is in Firestore. Memory Bank is where the exemption list belongs and it is the next thing I would build. |
+| **Model Armor** | no | Orthogonal rather than skipped. Model Armor guards what goes into and out of a model. Attestation guards what the code is. Model Armor stops an injection changing what an agent does; attestation stops a redeploy changing what an agent is. Neither substitutes for the other, and a fleet that wants to be trusted needs both. |
 
 ## Architecture
 
@@ -32,7 +107,7 @@ authorization extension. The bit I added is the admission step in between.
 
 | Part | State |
 |---|---|
-| Offline Confidential Space attestation verifier, 20 checks | **Live.** 17 tests against a real production token from a TEE in this project. |
+| Offline Confidential Space attestation verifier, 20 checks | **Live.** 17 tests: 15 against a real production token from a TEE in this project, one against a deliberately forged chain, one against the pinned root itself. |
 | Admission into Google's Agent Registry | **Live.** Four agents registered because an attestation checked out. |
 | Heartbeat re-attestation, revocation on drift | **Live.** Caught in about 60 seconds, end to end. |
 | Browser verification page | **Live** at [agent-attest.pages.dev](https://agent-attest.pages.dev). |
@@ -44,7 +119,7 @@ authorization extension. The bit I added is the admission step in between.
 
 | Path | What's in it |
 |---|---|
-| `verifier/` | Confidential Space attestation verification. Pure WebCrypto, offline PKI (`x5c`) path, no backend. Runs unchanged in a browser and in Node. 65,751 bytes gzipped, measured by `web/build.sh`. |
+| `verifier/` | Confidential Space attestation verification. Pure WebCrypto, offline PKI (`x5c`) path, no backend. Runs unchanged in a browser and in Node. About 66 kB gzipped, measured by `web/build.sh`. The exact byte count moves slightly between gzip implementations. |
 | `control-plane/` | Admission controller. Verifies, calls `services.create`, writes the admission record. |
 | `gateway-ext/` | Agent Gateway authorization extension. The gRPC callout that allows or denies. |
 | `agents/` | The fleet: Warden, Surveyor, Assessor, Executor. |
@@ -115,7 +190,7 @@ curl -s "https://firestore.googleapis.com/v1/projects/$PROJECT/databases/(defaul
 ```
 
 **6. See it catch a change.** Redeploys one agent with different code, under the same name
-and identity, never approved. Takes about 90 seconds.
+and identity, never approved. About 90 seconds to run, of which detection is the last 60.
 
 ```bash
 ./deploy/40-drift-demo.sh assessor
@@ -132,7 +207,7 @@ doesn't work.
 **Run the tests:**
 
 ```bash
-cd verifier && npm install && npm test    # 17 tests against a real TEE token
+cd verifier && npm install && npm test    # 17 tests, 15 of them against a real TEE token
 ```
 
 **Build the page locally:**

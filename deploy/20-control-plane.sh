@@ -23,7 +23,8 @@ echo "== deploying"
 # service needs both: one says who is calling, the other says what code is running.
 #
 # --min-instances=1 because the gateway authorization extension calls this on the
-# request path with a 1s budget and fails CLOSED. A cold start would deny live traffic.
+# request path with a 1s budget and fails CLOSED, once the policy binding exists. A cold
+# start would deny live traffic.
 gcloud run deploy agent-attest-control \
   --image="${IMAGE}" \
   --region="${REGION}" \

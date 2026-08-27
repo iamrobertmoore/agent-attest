@@ -16,24 +16,30 @@ well-informed agent that cannot change anything. Prompt-inject Assessor and you 
 opinion that Warden will not act on unless it validates. Compromise Executor and you have
 a narrow tool that does not decide what to point itself at.
 
-That structure is enforced by IAM and by the gateway, not by these instruction strings.
-The instructions describe the intent; the permissions are what make it true.
+That structure is enforced by IAM, and by the gateway once binding is possible. It is not
+enforced by these instruction strings. The instructions describe the intent; the
+permissions are what make it true.
 
 WHY THE WORKERS ARE REMOTE
 --------------------------
-Each worker is a RemoteA2aAgent, so every delegation is a network call that traverses
-Agent Gateway and hits the authorization extension. In-process sub-agents would be
-simpler and would prove nothing: the entire claim is that a worker's admission is checked
-on the hop, and there is no hop if they share a process.
+Each worker is a RemoteA2aAgent, so every delegation is a network call that CAN be checked
+by a gateway sitting in front of it. In-process sub-agents would be simpler and would prove
+nothing: the entire claim is that a worker's admission is checked on the hop, and there is
+no hop if they share a process.
 
-TWO LAYERS OF ENFORCEMENT, AND ONLY ONE OF THEM COUNTS
-------------------------------------------------------
+Be precise about the present tense here. The authorization extension is registered and the
+gateway resource exists, but the policy binding never completed, so today these calls are
+not traversing an enforcing gateway. See docs/GATEWAY.md.
+
+TWO LAYERS OF ENFORCEMENT, AND ONLY ONE OF THEM RUNS TODAY
+-----------------------------------------------------------
 before_tool_callback below refuses to delegate to a worker Warden believes is revoked.
 That is a courtesy, not a control: it runs inside Warden, so anything that compromises
-Warden removes it. The gateway check is the real one, because it runs somewhere the
-caller does not control. The client-side check exists to fail fast and to make the
-reason legible in Warden's own trace, and it is worth being clear that it is not a
-security boundary.
+Warden removes it. The gateway check is designed to be the real one, because it would run
+somewhere the caller does not control, and it fails closed. It is not bound yet, so right
+now the delegation hop is guarded by this callback and by IAM. The client-side check exists
+to fail fast and to make the reason legible in Warden's own trace, and it is worth being
+clear that it is not a security boundary.
 """
 
 from __future__ import annotations
@@ -64,7 +70,7 @@ def _worker(agent_id: str, description: str) -> RemoteA2aAgent:
     The host carries the agent id as its first label, which is the convention the
     authorization extension uses to work out which agent a request is addressed to.
     There is no documented attribute carrying the target's Agent Registry resource name,
-    so the mapping has to be ours, and it is defined in exactly two places: here and in
+    so the mapping has to be mine, and it is defined in exactly two places: here and in
     gateway-ext/server.py:target_agent_id.
     """
     return RemoteA2aAgent(

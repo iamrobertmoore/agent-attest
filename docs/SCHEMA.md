@@ -53,7 +53,7 @@ browser that wants to check the control plane's work.
 | `revokedReason` | string \| null | |
 | `lastAttestedAt` | timestamp | Updated on every verifying heartbeat. Drives freshness. |
 | `lastAttestedDigest` | string | Digest carried by that heartbeat. |
-| `attestationFailures` | int | Consecutive failures. Reconciler revokes past a threshold. |
+| `attestationFailures` | int | Consecutive failures. Recorded, not currently acted on. Revocation happens inline on the heartbeat that fails, not on a count. |
 
 `imageDigest` is the digest at admission and never changes. `lastAttestedDigest` is what the
 agent most recently proved it was running. **When those two diverge, that is the whole
@@ -75,8 +75,18 @@ Append-only. Every heartbeat, passing or failing.
 | `tokenSha256` | string |
 | `nonce` | string |
 
-This is the audit trail the Fleet track asks for under Telemetry, and it is what makes an
-incident reconstructable after the fact. Each entry also emits an OpenTelemetry span.
+This is the audit trail, and it is what makes an incident reconstructable after the fact.
+Every heartbeat lands here, passing or failing, with the per-check results that produced the
+verdict, so you can see not just that an agent was revoked but which of the twenty checks
+failed and when.
+
+It is world-readable and append-only, so it is evidence rather than a log I could edit later.
+
+**It is not OpenTelemetry.** The Fleet track asks for OpenTelemetry-compliant audit logs and
+reasoning-chain traces under Telemetry, and this is a durable audit trail rather than an
+instrumented one. Wiring the control plane's spans into Cloud Trace is genuinely small work
+and it is the next thing on the list, but it is not done, and a claim you cannot grep for is
+worth less than nothing on a project about checkable claims.
 
 ## `policies/admission`
 
@@ -123,8 +133,13 @@ claimed can still be routed to. Two things bound the risk in practice:
    destroying and recreating the VM, and the new instance's first heartbeat carries a
    different `image_id`, so the divergence surfaces on the next beat rather than needing to
    be detected.
-2. A background reconciler independently re-attests every admitted agent and sets `revoked`
-   on divergence, so the gateway check degrades to a boolean read.
+2. Revocation is written by the control plane on the heartbeat that fails, inline, in
+   `admission.ts`. By the time the gateway asks, the answer is already a boolean read.
+
+**There is no background reconciler,** and there cannot be one that re-attests. A Confidential
+Space token is minted by the workload itself from the launcher socket, so only the workload can
+produce one. A sweeper process is not the workload. Anything that claims to re-attest an agent
+without the agent's participation is claiming something the hardware does not allow.
 
 The residual is stated plainly in `REGISTRY_CAVEATS` and belongs in the write-up: an agent
 that drifts inside the window remains routable until its next missed heartbeat. Shortening

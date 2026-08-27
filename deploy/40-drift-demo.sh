@@ -104,8 +104,11 @@ print(" reason          :", (f.get("revokedReason") or {}).get("stringValue", "-
 print(" admitted digest :", f["imageDigest"]["stringValue"])
 print(" last attested   :", f["lastAttestedDigest"]["stringValue"])'
 
-hr "And the gateway decision"
-echo "(the authorization extension calls exactly this)"
-curl -s "${FS}/agents/${AGENT}" >/dev/null
-echo " an agent whose admission is revoked is refused on every hop, before"
-echo " any caller receives a response from it."
+hr "And the authorization decision"
+echo "(this is the exact call the gateway extension makes, live, right now)"
+curl -s -X POST -H "content-type: application/json" \
+  -d "{\"agentId\":\"${AGENT}\"}" "${CONTROL_PLANE_URL}/authorize"
+echo
+echo " That is a deny. The extension holds no policy of its own, it just relays"
+echo " this decision. The gateway policy binding never completed, so nothing is"
+echo " being refused at the network layer today. See docs/GATEWAY.md."

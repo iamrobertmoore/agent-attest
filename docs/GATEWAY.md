@@ -51,7 +51,7 @@ returned to the client."* That is the correct default for an authorization contr
 Every Agent Gateway authz sample in Google's documentation nonetheless sets
 `failOpen: true`. Copy-paste one and the control degrades to a suggestion: anything that
 makes the callout unreachable also makes it irrelevant, which is a property an attacker
-can arrange. We set it explicitly to `false` and say so.
+can arrange. I set it explicitly to `false` and say so.
 
 This is worth reporting to Google as a documentation issue rather than a pull request,
 since there may be a reason the samples are permissive that is not visible from outside.
@@ -75,7 +75,7 @@ Google's attributes describe the **caller** richly, via
 `connection.client_cert_spiffe_id`, and the **target** only through routing: `host`,
 `path`, `backend_service_name`.
 
-So the route-to-agent mapping is ours to define. Convention: each agent is fronted by a
+So the route-to-agent mapping is mine to define. Convention: each agent is fronted by a
 host `<agentId>.<suffix>`, and an explicit `x-agent-attest-agent` header overrides it so
 the thing is testable with curl. It lives in one function, `target_agent_id`, which is
 the single place that changes if Google later surfaces the target as an attribute.
@@ -107,7 +107,7 @@ Other constraints worth having in one place:
 | `wireFormat` | `EXT_AUTHZ_GRPC`, regional only |
 | `policyProfile` | `REQUEST_AUTHZ` |
 | `failOpen` | `false`, explicitly |
-| `timeout` | 10 to 10000 ms. Ours 1s, upstream call budgeted 800ms. |
+| `timeout` | 10 to 10000 ms. Mine 1s, upstream call budgeted 800ms. |
 | Max gRPC response | 128 kB |
 | LB scheme | `INTERNAL_MANAGED` or `EXTERNAL_MANAGED`, same region, same project as the forwarding rule |
 | IAM | `agentGateway.use` to attach policies |
