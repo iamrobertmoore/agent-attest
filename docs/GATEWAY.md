@@ -25,7 +25,7 @@ The language boundary follows Google's SDK boundary. Google ships callout SDKs f
 Python, Go and Java; only the Python one implements `ext_authz`
 (`AuthorizationServicer`), the other two are `ext_proc` only, and there is no Node SDK.
 Hand-rolling proto generation, H2C and health-check plumbing in Node for a fail-closed
-security control on a deadline is a decision that looks clever for two days.
+security control is a decision that looks clever for two days.
 
 ## What the per-request check actually checks
 
@@ -55,8 +55,8 @@ can arrange. I set it explicitly to `false` and say so.
 
 This is worth reporting to Google as a documentation issue rather than a pull request,
 since there may be a reason the samples are permissive that is not visible from outside.
-**Re-verify before submission.** Sponsor docs get fixed, and a claim that was true when
-written and false a week later reads badly in a public README the sponsor will read.
+**Check this against the current docs.** Google's docs get fixed, and this was true when
+written, not necessarily today.
 
 ### 2. `CONTENT_AUTHZ` cannot be made fail-closed
 
@@ -235,8 +235,8 @@ fleet where agents delegate to each other over the network.
 
 Agent Gateway governs MCP traffic. So at the time of writing, the gateway cannot sit in
 front of agent-to-agent calls in an ADK fleet, only in front of MCP tool and server calls.
-The track text pairs "Agent Gateway (for unified routing and policy enforcement)" with
-building "a scalable network of institutional agents", and those two things do not yet
+Agent Gateway is positioned "for unified routing and policy enforcement", and the platform
+for building "a scalable network of institutional agents". Those two things do not yet
 meet.
 
 Also worth noting from the same schema dump, since none of it appears in the prose docs:
@@ -303,7 +303,7 @@ a protocol adapter with no policy of its own, and the decision is identical eith
 When Agent Gateway supports A2A, binding it requires no code change, because there is no
 policy in the callout to move.
 
-**Do not claim the gateway enforces anything in the submission.** Claim what is true: the
+**This project does not claim the gateway enforces anything.** What it does claim: the
 extension is a registered Google resource, the decision path is live and demonstrable, and
 the binding is blocked by a platform limitation that is documented here with its exact
 error text.

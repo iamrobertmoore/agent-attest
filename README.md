@@ -84,15 +84,15 @@ That gateway check is built and registered but never got bound, so the delegatio
 currently guarded by the fast-fail callback and by IAM, and not by the gateway. See
 [docs/GATEWAY.md](docs/GATEWAY.md), which does not flatter me.
 
-## Against the Fortified Enterprise Fleet component list
+## Which Google agent platform components it uses
 
-The track names seven platform components. Here is what I actually used, including the ones I
+Google's agent platform has seven components. Here is what I actually used, including the ones I
 didn't, because a checklist answered honestly is more useful than one answered generously.
 
 | Component | Used | What I did |
 |---|---|---|
 | **Agent Registry** | yes | Four agents in the real registry, each one there because an attestation verified. This is the centre of the project. |
-| **Agent Identity** | yes, as the subject | The whole entry is an argument about what a SPIFFE ID does and does not prove. It proves where. It does not prove what. |
+| **Agent Identity** | yes, as the subject | The whole project is an argument about what a SPIFFE ID does and does not prove. It proves where. It does not prove what. |
 | **Agent Gateway** | partly | Real `authzExtension` and gateway resources, verified against Envoy `ext_authz` v3 protos. The policy binding never completed. See [docs/GATEWAY.md](docs/GATEWAY.md). |
 | **Agent Observability** | partly | Append-only, world-readable attestation trail with per-check results on every heartbeat. It is a durable audit log. It is not OpenTelemetry instrumented, and I'm not going to call it that. |
 | **Agent Runtime** | no | The workload has to mint its own hardware attestation, which means it has to be the thing running in the TEE. That rules out a managed runtime for the fleet itself. The control plane does run on Cloud Run. |

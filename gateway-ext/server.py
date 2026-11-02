@@ -10,7 +10,7 @@ WHY PYTHON, IN AN OTHERWISE TYPESCRIPT REPO
 Google ships callout SDKs for Python, Go and Java, and only the Python one implements
 ext_authz (`AuthorizationServicer`); the Go and Java SDKs are ext_proc only. There is no
 Node SDK. Hand-rolling the proto generation, H2C and health-check plumbing in Node for a
-fail-closed security control on a deadline is the kind of decision that looks clever for
+fail-closed security control is the kind of decision that looks clever for
 two days and then costs a week.
 
 So the language boundary follows the SDK boundary, and the decision stays in one place

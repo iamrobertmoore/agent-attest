@@ -2,7 +2,7 @@
 # Bundle the verifier for the browser and stage the sample fixture.
 #
 # The same source that runs in the Cloud Run control plane is bundled here unchanged.
-# That is the point of the page: a judge recomputes the control plane's verdict with the
+# That is the point of the page: a visitor recomputes the control plane's verdict with the
 # control plane's own code, rather than a second implementation written to agree with it.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"

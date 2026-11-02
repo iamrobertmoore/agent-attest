@@ -2,7 +2,7 @@
  * The thin client for Google's Agent Registry.
  *
  * Deliberately thin. This project's contribution is the admission decision, not a
- * reimplementation of the sponsor's product, and every call here is one the platform
+ * reimplementation of Google's product, and every call here is one the platform
  * already documents.
  *
  * WHAT THE REGISTRY WILL AND WILL NOT STORE
